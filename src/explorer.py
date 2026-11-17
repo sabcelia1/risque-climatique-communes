@@ -26,10 +26,12 @@ def main() -> int:
         print("Lancez d'abord src/clean.py", file=sys.stderr)
         return 1
     cat = pd.read_parquet(chemin)
+    if "evenement_repete" in cat.columns:          # un événement = une ligne
+        cat = cat[~cat["evenement_repete"]]
     communes = pd.read_parquet(PROCESSED_DIR / "communes.parquet")
     md = ["# Exploration des données CatNat", "",
           f"_Généré par `src/explorer.py` le {pd.Timestamp.today():%d/%m/%Y} "
-          f"sur {len(cat):,} reconnaissances._", ""]
+          f"sur {len(cat):,} événements reconnus (distincts)._", ""]
 
     # Reconnaissances par année d'événement (les années récentes sont-elles complètes ?)
     par_an = cat.groupby("annee").size()

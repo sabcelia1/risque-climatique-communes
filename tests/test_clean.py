@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from clean import (corriger_encodage, famille_peril, harmoniser_colonnes,  # noqa: E402
+from clean import (agreger, corriger_encodage, famille_peril, harmoniser_colonnes,  # noqa: E402
                    lire_dates, normaliser_code_insee)
 
 
@@ -22,6 +22,9 @@ from clean import (corriger_encodage, famille_peril, harmoniser_colonnes,  # noq
     ("Vents cycloniques", "vent_tempete"),
     ("Séisme", "seisme"),
     ("Secousse sismique", "seisme"),
+    ("Chocs Mécaniques liés à l'action des Vagues", "vent_tempete"),
+    ("Raz de Marée", "inondation"),
+    ("Poids de la Neige", "autre"),
     ("Avalanche", "autre"),
     ("", "inconnu"),
     (None, "inconnu"),
@@ -77,3 +80,20 @@ def test_harmoniser_colonnes_libelles_longs():
 def test_harmoniser_colonnes_manquantes():
     with pytest.raises(SystemExit):
         harmoniser_colonnes(pd.DataFrame(columns=["foo", "bar"]))
+
+
+def test_agreger_compte_les_evenements_distincts():
+    df = pd.DataFrame({"code_insee": ["01001"] * 3, "annee": [2022] * 3,
+                       "famille_peril": ["secheresse"] * 3,
+                       "evenement_repete": [False, True, False]})
+    out = agreger(df)
+    assert out["nb_evenements"].tolist() == [2]
+
+
+def test_harmoniser_colonnes_version_2026():
+    cols = ["id_gaspar", "code_commune", "libelle_commune", "num_risque_jo", "lib_risque_jo",
+            "date_debut", "date_fin", "date_signature_arrete", "date_publication_jo", "date_modification"]
+    out = harmoniser_colonnes(pd.DataFrame([cols], columns=cols))
+    assert set(out.columns) == {"id_reconnaissance", "code_insee", "nom_commune", "libelle_peril",
+                                "date_debut", "date_fin", "date_arrete", "date_jo"}
+    assert out["libelle_peril"].iloc[0] == "lib_risque_jo"

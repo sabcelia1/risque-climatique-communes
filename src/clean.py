@@ -77,14 +77,14 @@ def lire_dates(serie: pd.Series) -> pd.Series:
 
 # Colonnes attendues -> noms possibles selon les versions du fichier
 SYNONYMES = {
-    "id_reconnaissance": ["cod_nat_catnat", "code_national_catnat", "code_catnat", "id_catnat"],
+    "id_reconnaissance": ["id_gaspar", "cod_nat_catnat", "code_national_catnat", "code_catnat", "id_catnat"],
     "code_insee":        ["cod_commune", "code_commune", "code_insee", "insee", "codgeo"],
-    "nom_commune":       ["lib_commune", "nom_commune", "libelle_commune"],
+    "nom_commune":       ["libelle_commune", "lib_commune", "nom_commune", "libelle_commune"],
     "libelle_peril":     ["lib_risque_jo", "libelle_risque_jo", "lib_risque", "libelle_risque", "risque"],
     "date_debut":        ["dat_deb", "date_deb", "date_debut", "dat_debut", "date_debut_evt"],
     "date_fin":          ["dat_fin", "date_fin", "date_fin_evt"],
-    "date_arrete":       ["dat_pub_arrete", "date_pub_arrete", "dat_arrete", "date_arrete"],
-    "date_jo":           ["dat_pub_jo", "date_pub_jo", "dat_jo", "date_jo"],
+    "date_arrete":       ["date_signature_arrete", "dat_pub_arrete", "date_pub_arrete", "dat_arrete", "date_arrete"],
+    "date_jo":           ["date_publication_jo", "dat_pub_jo", "date_pub_jo", "dat_jo", "date_jo"],
 }
 OBLIGATOIRES = ["code_insee", "libelle_peril", "date_debut"]
 
@@ -233,14 +233,22 @@ def nettoyer_catnat(codes_valides: set[str]) -> pd.DataFrame:
     n_old = int((~df["commune_actuelle"]).sum())
     log("catnat", "codes absents du référentiel actuel (communes fusionnées ?)",
         f"{n_old:,} ({n_old / len(df):.1%}) — rattachement prévu à l'étape 2")
+    # 6. Un même événement peut apparaître sur plusieurs lignes (arrêtés
+    #    rectificatifs, dates de publication corrigées) : on le repère
+    cle_evt = ["code_insee", "libelle_peril", "date_debut", "date_fin"]
+    df["evenement_repete"] = df.duplicated(subset=cle_evt, keep="first")
+    log("catnat", "lignes répétant un même événement (arrêtés rectificatifs probables, conservées)",
+        f"{int(df['evenement_repete'].sum()):,}")
     log("catnat", "reconnaissances retenues", f"{len(df):,}")
+    log("catnat", "événements distincts (commune x péril x dates)", f"{int((~df['evenement_repete']).sum()):,}")
     return df
 
 
 def agreger(df: pd.DataFrame) -> pd.DataFrame:
-    """Nombre de reconnaissances par commune, année et famille de péril."""
-    return (df.groupby(["code_insee", "annee", "famille_peril"], as_index=False)
-              .size().rename(columns={"size": "nb_reconnaissances"}))
+    """Nombre d'événements reconnus (distincts) par commune, année et famille de péril."""
+    distincts = df[~df["evenement_repete"]] if "evenement_repete" in df.columns else df
+    return (distincts.groupby(["code_insee", "annee", "famille_peril"], as_index=False)
+                     .size().rename(columns={"size": "nb_evenements"}))
 
 
 # --- Export et rapport -------------------------------------------------------------------

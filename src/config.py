@@ -36,11 +36,11 @@ SOURCES = {
 # par mots-clés, dans l'ordre : la première famille reconnue l'emporte.
 FAMILLES_PERILS = [
     ("secheresse",        ["secheresse", "rehydratation", "retrait", "gonflement"]),
-    ("inondation",        ["inondation", "coulee", "crue", "remontee de nappe", "submersion", "lave torrentielle"]),
+    ("inondation",        ["inondation", "coulee", "crue", "remontee de nappe", "submersion", "lave torrentielle", "raz de maree"]),
     ("mouvement_terrain", ["mouvement", "glissement", "eboulement", "effondrement", "affaissement", "chute de bloc"]),
-    ("vent_tempete",      ["vent", "tempete", "cyclon", "ouragan", "tornade", "houle"]),
+    ("vent_tempete",      ["vent", "tempete", "cyclon", "ouragan", "tornade", "houle", "vague"]),  # vagues : tempêtes littorales
     ("seisme",            ["seisme", "sism", "tremblement de terre"]),
-    ("autre",             []),  # tout le reste (avalanche, grêle, poids de la neige…)
+    ("autre",             []),  # tout le reste : poids de la neige, grêle, avalanche, éruption volcanique…
 ]
 
 # Arrondissements municipaux -> commune, pour harmoniser les jointures
