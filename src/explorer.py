@@ -42,6 +42,10 @@ def main() -> int:
         delai = (pd.to_datetime(cat["date_arrete"]) - pd.to_datetime(cat["date_debut"])).dt.days
         md += [f"Délai médian entre le début de l'événement et l'arrêté : **{delai.median():.0f} jours** "
                f"(90 % des arrêtés en moins de {delai.quantile(0.9):.0f} jours).", ""]
+        par_famille = (delai.groupby(cat["famille_peril"]).agg(["median", lambda d: d.quantile(0.9)])
+                       .round(0).astype(int).reset_index())
+        par_famille.columns = ["Famille de péril", "Délai médian (jours)", "Délai 90 % (jours)"]
+        md += ["Délai par famille de péril :", "", tableau(par_famille), ""]
 
     # H1 — part de la sécheresse par période
     periodes = pd.cut(cat["annee"].astype(int), bins=[1981, 1999, 2014, 2100],

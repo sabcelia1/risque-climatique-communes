@@ -84,7 +84,7 @@ Répartition des reconnaissances par famille de péril (%) :
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Reconnaissances | 4 022 | 2 838 | 8 089 | 3 454 | 3 277 | **555** | **0** |
 
-- Délai entre le début de l'événement et l'arrêté : **40 jours en médiane**, mais **483 jours** pour 90 % des cas : les sécheresses sont reconnues bien plus tard que les inondations.
+- Délai entre le début de l'événement et l'arrêté : **40 jours en médiane**, mais **483 jours** pour 90 % des cas. Ce long délai vient probablement des sécheresses, dont la reconnaissance demande un recul sur toute la saison : à vérifier avec le délai par famille de péril (ajouté à `explorer.py`).
 - **Aucun événement de 2026** dans une extraction du 2 novembre 2026, alors que la moitié des arrêtés sont pris en moins de 40 jours : l'export semble arrêté aux événements de 2025, voire en retard. À vérifier sur la prochaine version.
 - 📌 **Décision :** **2025 est exclue** de l'apprentissage et de l'évaluation, car elle est incomplète. La période de modélisation s'arrête à 2024.
 
