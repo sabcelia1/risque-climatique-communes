@@ -97,3 +97,17 @@ def test_harmoniser_colonnes_version_2026():
     assert set(out.columns) == {"id_reconnaissance", "code_insee", "nom_commune", "libelle_peril",
                                 "date_debut", "date_fin", "date_arrete", "date_jo"}
     assert out["libelle_peril"].iloc[0] == "lib_risque_jo"
+
+
+def test_meme_identifiant_periodes_differentes_conservees(tmp_path, monkeypatch):
+    """Un identifiant GASPAR couvrant deux périodes de sécheresse = deux événements."""
+    import clean
+    (tmp_path / "catnat_gaspar.csv").write_text(
+        "id_gaspar;code_commune;lib_risque_jo;date_debut;date_fin\n"
+        "A1;01001;Sécheresse;2018-01-01;2018-03-31\n"
+        "A1;01001;Sécheresse;2018-07-01;2018-09-30\n"
+        "A1;01001;Sécheresse;2018-07-01;2018-09-30\n", encoding="utf-8")
+    monkeypatch.setattr(clean, "RAW_DIR", tmp_path)
+    df = clean.nettoyer_catnat({"01001"})
+    assert len(df) == 2                                   # le doublon exact est retiré
+    assert int((~df["evenement_repete"]).sum()) == 2      # deux périodes distinctes

@@ -187,11 +187,14 @@ def nettoyer_catnat(codes_valides: set[str]) -> pd.DataFrame:
     avant = len(df)
     df = df.drop_duplicates()
     log("catnat", "lignes strictement identiques supprimées", f"{avant - len(df):,}")
-    cle = [c for c in ("id_reconnaissance", "code_insee", "libelle_peril") if c in df.columns]
-    if "id_reconnaissance" in cle:
-        avant = len(df)
-        df = df.drop_duplicates(subset=cle, keep="first")
-        log("catnat", f"doublons sur ({', '.join(cle)}) supprimés", f"{avant - len(df):,}")
+    # L'identifiant GASPAR n'est PAS unique par événement : un même identifiant
+    # peut couvrir plusieurs périodes (fréquent pour la sécheresse) ou plusieurs
+    # anciennes communes regroupées. On ne supprime donc rien sur cette base ;
+    # les événements distincts sont repérés plus bas (commune x péril x dates).
+    if "id_reconnaissance" in df.columns:
+        partages = df.duplicated(subset=["id_reconnaissance", "code_insee", "libelle_peril"], keep=False)
+        log("catnat", "lignes partageant un identifiant avec une autre (même commune et péril, conservées)",
+            f"{int(partages.sum()):,}")
 
     # 2. Accents mal encodés
     for col in ("libelle_peril", "nom_commune"):
