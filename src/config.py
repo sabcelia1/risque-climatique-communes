@@ -39,7 +39,7 @@ FAMILLES_PERILS = [
     ("inondation",        ["inondation", "coulee", "crue", "remontee de nappe", "submersion", "lave torrentielle"]),
     ("mouvement_terrain", ["mouvement", "glissement", "eboulement", "effondrement", "affaissement", "chute de bloc"]),
     ("vent_tempete",      ["vent", "tempete", "cyclon", "ouragan", "tornade", "houle"]),
-    ("seisme",            ["seisme", "sisme"]),
+    ("seisme",            ["seisme", "sism", "tremblement de terre"]),
     ("autre",             []),  # tout le reste (avalanche, grêle, poids de la neige…)
 ]
 

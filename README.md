@@ -39,7 +39,7 @@ La base GASPAR présente plusieurs défauts signalés publiquement par ses utili
 | Défaut connu | Traitement |
 |---|---|
 | Fichier publié tantôt en CSV, tantôt en ZIP aux noms variables (`catnat_gaspar.csv.csv`…) | Détection automatique, extraction de la table CatNat |
-| Colonnes renommées entre versions | Table de correspondance des noms (`SYNONYMES`) |
+| Colonnes renommées entre versions | Noms connus (`SYNONYMES`), puis détection par mots-clés (`MOTS_CLES`) ; colonnes trouvées listées dans le rapport |
 | Lignes répétées 2 ou 3 fois | Dédoublonnage, nombre de lignes supprimées tracé |
 | Accents mal encodés (« SÃ©cheresse ») | Réparation automatique |
 | Dates incohérentes (fin avant début, événements de plus d'un an hors sécheresse) | Mises à vide ou signalées, jamais supprimées en silence |
@@ -50,7 +50,7 @@ Les règles de nettoyage sont couvertes par des **tests unitaires** (`tests/`), 
 
 ## 🚀 Reproduire le projet
 
-**Windows :** double-cliquez sur `lancer.bat` (environnement, tests, téléchargement, nettoyage).
+**Windows :** double-cliquez sur `lancer.bat` (environnement, tests, téléchargement, nettoyage, exploration).
 
 **Manuellement :**
 
@@ -64,6 +64,7 @@ pip install -r requirements.txt
 python -m pytest -q                # tests
 python src/ingest.py               # téléchargement
 python src/clean.py                # nettoyage + rapport qualité
+python src/explorer.py             # chiffres clés -> reports/exploration.md
 ```
 
 ## 🛠️ Stack

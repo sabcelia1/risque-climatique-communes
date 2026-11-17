@@ -21,6 +21,7 @@ from clean import (corriger_encodage, famille_peril, harmoniser_colonnes,  # noq
     ("Tempête", "vent_tempete"),
     ("Vents cycloniques", "vent_tempete"),
     ("Séisme", "seisme"),
+    ("Secousse sismique", "seisme"),
     ("Avalanche", "autre"),
     ("", "inconnu"),
     (None, "inconnu"),
@@ -56,6 +57,21 @@ def test_harmoniser_colonnes_versions():
     assert {"code_insee", "libelle_peril", "date_debut", "id_reconnaissance"} <= set(
         harmoniser_colonnes(ancienne).columns)
     assert set(harmoniser_colonnes(nouvelle).columns) == {"code_insee", "libelle_peril", "date_debut"}
+
+
+def test_harmoniser_colonnes_libelles_longs():
+    cols = ["Code National CATNAT", "Code INSEE Commune", "Libellé Commune", "num_risque_jo",
+            "Libellé Risque JO", "Date Début Evt", "Date Fin Evt",
+            "Date Publication Arrêté", "Date Publication JO", "dat_maj"]
+    out = harmoniser_colonnes(pd.DataFrame(columns=cols))
+    attendu = {"id_reconnaissance": "Code National CATNAT", "code_insee": "Code INSEE Commune",
+               "nom_commune": "Libellé Commune", "libelle_peril": "Libellé Risque JO",
+               "date_debut": "Date Début Evt", "date_fin": "Date Fin Evt",
+               "date_arrete": "Date Publication Arrêté", "date_jo": "Date Publication JO"}
+    df = pd.DataFrame([cols], columns=cols)
+    out = harmoniser_colonnes(df)
+    for cible, source in attendu.items():
+        assert out[cible].iloc[0] == source, cible
 
 
 def test_harmoniser_colonnes_manquantes():

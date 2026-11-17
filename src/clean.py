@@ -89,8 +89,22 @@ SYNONYMES = {
 OBLIGATOIRES = ["code_insee", "libelle_peril", "date_debut"]
 
 
+# Si aucun nom exact ne correspond : règles par mots-clés (tous doivent être présents)
+MOTS_CLES = {
+    "id_reconnaissance": [["catnat"], ["cod", "nat"]],
+    "code_insee":        [["insee"], ["cod", "commune"], ["codgeo"]],
+    "nom_commune":       [["lib", "commune"], ["nom", "commune"]],
+    "libelle_peril":     [["lib", "risque"], ["risque"], ["peril"]],
+    "date_debut":        [["deb"]],
+    "date_fin":          [["fin"]],
+    "date_arrete":       [["arrete"]],
+    "date_jo":           [["jo"]],
+}
+
+
 def harmoniser_colonnes(df: pd.DataFrame) -> pd.DataFrame:
-    """Renomme les colonnes vers des noms stables, quelle que soit la version."""
+    """Renomme les colonnes vers des noms stables, quelle que soit la version :
+    noms exacts connus d'abord, puis règles par mots-clés."""
     normalises = {c: re.sub(r"[^a-z0-9]+", "_", sans_accents(c)).strip("_") for c in df.columns}
     inverse = {nom_norm: c for c, nom_norm in normalises.items()}
     renommage = {}
@@ -98,12 +112,30 @@ def harmoniser_colonnes(df: pd.DataFrame) -> pd.DataFrame:
         trouve = next((inverse[p] for p in possibles if p in inverse), None)
         if trouve is not None:
             renommage[trouve] = cible
+    for cible, regles in MOTS_CLES.items():
+        if cible in renommage.values():
+            continue
+        for regle in regles:
+            libres = [c for c, n in normalises.items() if c not in renommage
+                      and all(m in n.split("_") or m in n for m in regle)]
+            if cible == "id_reconnaissance":   # ne pas confondre avec une date
+                libres = [c for c in libres if "dat" not in normalises[c]]
+            if cible in ("date_debut", "date_fin", "date_arrete", "date_jo"):
+                libres = [c for c in libres if "dat" in normalises[c] or cible == "date_jo"]
+            if cible == "date_jo":             # « jo » doit être un mot entier
+                libres = [c for c in libres if "jo" in normalises[c].split("_")
+                          and ("dat" in normalises[c] or "pub" in normalises[c])]
+            if cible == "libelle_peril":       # pas le code numérique du risque
+                libres = [c for c in libres if not normalises[c].startswith(("num", "cod"))]
+            if libres:
+                renommage[libres[0]] = cible
+                break
     manquantes = [c for c in OBLIGATOIRES if c not in renommage.values()]
     if manquantes:
         raise SystemExit(
             f"Colonnes introuvables dans le fichier CatNat : {manquantes}.\n"
             f"Colonnes présentes : {list(df.columns)}\n"
-            "Envoyez ce message pour adapter config/SYNONYMES.")
+            "Envoyez ce message pour adapter SYNONYMES ou MOTS_CLES dans src/clean.py.")
     return df.rename(columns=renommage)[list(dict.fromkeys(renommage.values()))]
 
 
@@ -145,7 +177,11 @@ def nettoyer_catnat(codes_valides: set[str]) -> pd.DataFrame:
     brut, encodage = lire_csv_robuste(RAW_DIR / "catnat_gaspar.csv")
     log("catnat", "encodage détecté", encodage)
     log("catnat", "lignes brutes", f"{len(brut):,}")
+    log("catnat", "colonnes du fichier", ", ".join(f"`{c}`" for c in brut.columns))
     df = harmoniser_colonnes(brut)
+    absentes = [c for c in SYNONYMES if c not in df.columns]
+    if absentes:
+        log("catnat", "colonnes attendues non reconnues", ", ".join(absentes))
 
     # 1. Doublons (signalés sur data.gouv.fr : lignes répétées 2 ou 3 fois)
     avant = len(df)

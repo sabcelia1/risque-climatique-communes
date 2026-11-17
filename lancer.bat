@@ -25,7 +25,11 @@ echo === Etape 2 : nettoyage et controles qualite
 ".venv\Scripts\python.exe" src\clean.py || goto :erreur
 
 echo.
-echo === Termine ! Rapport qualite : reports\qualite_donnees.md
+echo === Etape 3 : exploration
+".venv\Scripts\python.exe" src\explorer.py || goto :erreur
+
+echo.
+echo === Termine ! Rapports : reports\qualite_donnees.md et reports\exploration.md
 pause
 exit /b 0
 
