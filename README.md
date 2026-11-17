@@ -2,7 +2,7 @@
 
 > Prévoir quelles communes françaises risquent une catastrophe naturelle reconnue (inondation, sécheresse, mouvement de terrain…), expliquer pourquoi, et produire des fiches de risque lisibles par un assureur grâce à l'IA générative.
 
-**Statut :** 🚧 en cours — étape 1/5 (ingestion et qualité)
+**Statut :** 🚧 en cours — étape 2/5 (data engineering)
 
 ---
 
@@ -18,7 +18,7 @@ Ce projet construit, à partir de données publiques :
 
 ## 🗺️ Feuille de route
 
-- [ ] **Étape 1** — Ingestion et qualité : base GASPAR, référentiel des communes, tests automatiques
+- [x] **Étape 1** — Ingestion et qualité : base GASPAR, référentiel des communes, 25 tests automatiques
 - [ ] **Étape 2** — Data engineering : modèles dbt dans BigQuery, mise à jour automatique (GitHub Actions)
 - [ ] **Étape 3** — Machine learning : prédiction du risque, validation temporelle, explicabilité (SHAP)
 - [ ] **Étape 4** — IA générative : fiches de risque contrôlées, assistant en langage naturel
@@ -31,6 +31,14 @@ Ce projet construit, à partir de données publiques :
 | [Base GASPAR](https://www.data.gouv.fr/datasets/base-nationale-de-gestion-assistee-des-procedures-administratives-relatives-aux-risques-gaspar) | Ministère de la Transition écologique | Arrêtés de catastrophe naturelle par commune depuis 1982 | Licence Ouverte |
 | [API Découpage administratif](https://geo.api.gouv.fr/decoupage-administratif) | Etalab | Communes, population, superficie, coordonnées | Licence Ouverte |
 | [API Géorisques](https://www.data.gouv.fr/dataservices/api-georisques) *(étape 3)* | Ministère de la Transition écologique, BRGM | Exposition aux inondations et aux argiles | Licence Ouverte |
+
+## 🔎 Premiers résultats
+
+Sur **246 088 événements reconnus** depuis 1982 (détail dans le [journal d'analyse](docs/journal_analyse.md)) :
+
+- **La sécheresse est devenue le premier péril reconnu** : 6 % des reconnaissances avant 2000, **51 % depuis 2015**.
+- **Elle est reconnue très tard** : 533 jours en médiane, contre 34 pour une inondation. Les années récentes sont donc incomplètes, ce qui impose une évaluation du modèle adaptée à chaque péril.
+- **Le risque est diffus** : 98,9 % des communes ont été touchées au moins une fois, avec une forte présence des Alpes-Maritimes parmi les plus touchées.
 
 ## 🧹 Qualité des données
 
