@@ -6,6 +6,8 @@ models:
     columns:
       - name: delai_reconnaissance_jours
         description: Jours entre le début de l'événement et la signature de l'arrêté.
+      - name: annee_connue
+        description: Première année au 1er janvier de laquelle l'événement est reconnu (année de l'arrêté + 1).
 
   - name: int_grille_commune_annee
     description: Une ligne par commune, année (jusqu'à l'année à prédire) et famille modélisée (sécheresse, inondation), zéros compris.
@@ -13,3 +15,8 @@ models:
       - lignes_uniques:
           arguments:
             colonnes: [code_insee, annee, famille_peril]
+
+  - name: int_historique_a_date
+    description: >
+      Historique de chaque commune tel qu'il était connu au 1er janvier de l'année :
+      seuls les événements antérieurs dont l'arrêté était déjà signé sont comptés.

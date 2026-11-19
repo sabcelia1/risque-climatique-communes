@@ -25,7 +25,7 @@ service-account*.json
 **/.pbi/localSettings.json
 
 # Modèles entraînés (régénérés par src/modele.py)
-models/
+/models/
 
 # dbt
 dbt/target/

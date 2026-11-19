@@ -7,9 +7,10 @@ points donne la part du territoire en aléa faible, moyen ou fort.
 Sources (Licence Ouverte) :
   - zonage d'exposition au retrait-gonflement des argiles (BRGM, 2019), via Géorisques ;
   - contours des communes, Etalab (découpage administratif).
-Résultat : data/reference/exposition_argiles.csv, versionné dans le dépôt.
+Résultat : dbt/seeds/exposition_argiles.csv, versionné dans le dépôt et chargé par dbt.
 
-Usage (lourd : ~1 Go à télécharger, lancé par GitHub Actions) :
+Usage (lourd : 650 Mo à télécharger, 13 min ; lancé à la demande par GitHub Actions,
+workflow « Exposition aux argiles ») :
     python src/exposition_argiles.py
 """
 
@@ -24,14 +25,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from config import DATA_DIR
+from config import ROOT_DIR
 from ingest import telecharger
 
 URL_ALEA = "https://files.georisques.fr/argiles/AleaRG_Fxx_L93.zip"
 URL_COMMUNES = ("https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/"
                 "2025/geojson/communes-100m.geojson.gz")
 POINTS_PAR_COMMUNE = 200
-SORTIE = DATA_DIR / "reference" / "exposition_argiles.csv"
+SORTIE = ROOT_DIR / "dbt" / "seeds" / "exposition_argiles.csv"   # table de référence dbt
 NIVEAUX = {1: "faible", 2: "moyen", 3: "fort"}
 
 

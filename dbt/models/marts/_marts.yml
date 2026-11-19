@@ -44,6 +44,19 @@ models:
               arguments:
                 values: [0, 1]
                 quote: false
+      - name: cible_3ans
+        description: 1 si au moins une reconnaissance entre l'année et l'année + 2.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: cible_5ans
+        description: 1 si au moins une reconnaissance entre l'année et l'année + 4.
+      - name: annee_evaluable_3ans
+        description: Vrai si les 3 années de la fenêtre sont complètes.
+      - name: annee_evaluable_5ans
+        description: Vrai si les 5 années de la fenêtre sont complètes.
       - name: famille_peril
         data_tests:
           - accepted_values:
@@ -59,5 +72,7 @@ models:
         description: >
           Vrai pour l'année qui suit la dernière année étudiée (annee_fin + 1) : ses
           variables sont connues, sa cible ne l'est pas encore. Le modèle prédit ces lignes.
-      - name: taux_dept_annee_prec
-        description: Part des communes du département touchées l'année précédente.
+      - name: taux_dept_5ans
+        description: >
+          Fréquence annuelle moyenne de reconnaissance dans le département sur les
+          5 dernières années, d'après les seuls arrêtés connus au 1er janvier.

@@ -5,6 +5,7 @@ profile: risque_climatique
 
 model-paths: ["models"]
 macro-paths: ["macros"]
+seed-paths: ["seeds"]
 test-paths: ["tests"]
 target-path: "target"
 clean-targets: ["target", "logs"]
@@ -18,6 +19,12 @@ vars:
     inondation: 2024
     secheresse: 2021
   annees_historique_min: 10  # recul nécessaire pour calculer les variables sur 10 ans
+
+seeds:
+  risque_climatique:
+    exposition_argiles:
+      +column_types:
+        code_insee: "{{ 'string' if target.type == 'bigquery' else 'varchar' }}"
 
 models:
   risque_climatique:

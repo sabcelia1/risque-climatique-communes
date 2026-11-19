@@ -30,7 +30,7 @@ echo === Etape 3 : exploration
 
 echo.
 echo === Etape 4 : modeles dbt et tests, en local (DuckDB)
-.venv\Scripts\python.exe" src\lancer_dbt.py local || goto :erreur
+".venv\Scripts\python.exe" src\lancer_dbt.py local || goto :erreur
 
 echo.
 echo === Etape 5 : modele de prediction (LightGBM, SHAP)

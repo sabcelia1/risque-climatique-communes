@@ -167,3 +167,77 @@ La colonne `annee_evaluable` signale les autres lignes, que l'étape 3 n'utilise
 
 - **Communes fusionnées :** les 0,2 % de lignes dont le code a disparu du référentiel (H3) sont écartées des modèles plutôt que rattachées, faute de table de passage simple à maintenir. Effet négligeable vu leur volume.
 - **Population actuelle :** la population et la superficie sont celles d'aujourd'hui, appliquées à toutes les années. C'est acceptable pour un ordre de grandeur (effet de taille), mais ce n'est pas la population de chaque année.
+
+---
+
+## Étape 3 — Machine learning
+
+### 📌 Protocole
+
+- **Un modèle par péril** (inondation, sécheresse), cible : « au moins une reconnaissance dans l'année ».
+- **Découpage temporel**, années évaluables seulement (décision de l'étape 1) :
+
+| Péril | Entraînement | Validation (choix du modèle) | Test (une seule fois) |
+|---|---|---|---|
+| Inondation | 1992-2018 | 2019-2020 | 2021-2024 |
+| Sécheresse | 1992-2014 | 2015-2016 | 2017-2021 |
+
+- **Deux références** à battre : l'historique de la commune (fréquence depuis 1982) et une régression logistique.
+- **Métriques par année :** le niveau global d'une année dépend de sa météo, inconnue au 1er janvier. On mesure donc la capacité à **classer** les communes au sein d'une même année : AUC, et part des communes touchées captée par les 10 % de communes jugées les plus à risque (« top 10 % » ; un ciblage au hasard en capte 10 %).
+- Les essais ont été faits sur une branche séparée ([`experiences`](https://github.com/sabcelia1/risque-climatique-communes/tree/experiences)), et **seule la validation** a servi à décider.
+
+### ❌ Fuite de données n° 2 : des informations pas encore disponibles
+
+- **Observation :** au 1er janvier, **0 %** des sécheresses de l'année précédente sont déjà reconnues, contre 81,5 % des inondations (délai médian de 533 jours, H5).
+- **Problème :** la première version comptait tous les événements des années passées, y compris ceux dont l'arrêté n'avait pas encore été signé. Le modèle s'entraînait donc avec une information qu'il n'aurait jamais au moment de prédire, et ses prédictions réelles (où les années récentes sont incomplètes) auraient été biaisées.
+- 📌 **Décision :** variables **« à date »** (`int_historique_a_date`) : un événement n'est compté que si son arrêté est signé avant le 1er janvier de l'année prédite. Le test anti-fuite a été réécrit avec une logique inverse (chaque événement projeté en avant) et vérifié en réintroduisant volontairement la fuite (2 001 lignes en erreur sur les données d'essai).
+- **Effet :** dans les essais (protocole identique), l'AUC de test de la sécheresse baisse d'environ 0,01 : la première version était un peu trop optimiste.
+
+### Essais écartés (décidés sur la validation)
+
+| Essai | Effet en validation | Décision |
+|---|---|---|
+| Régularisation plus forte | ± 0,005 d'AUC | Écarté : pas d'effet net |
+| Entraînement sur les 12 dernières années seulement | + 0,01 inondation, - 0,01 sécheresse | Écarté : effet contradictoire |
+| Plans de prévention (PPR) et atlas des zones inondables, datés | + 0,003 à + 0,009 | Écarté pour le modèle : gain dans le bruit, l'historique contient déjà l'information. Utile pour les fiches de l'étape 4. |
+
+- **Le bruit :** le seul changement d'ordre des lignes fait varier l'AUC d'environ 0,01. Les écarts plus faibles que cela ne justifient pas d'ajouter de la complexité.
+- Les communes couvertes par un PPR sont pourtant **deux fois** plus souvent reconnues (inondation : 7,2 % contre 3,6 % par an sur 2015-2021 ; sécheresse : 11,4 % contre 4,9 %). Un fort lien isolé n'apporte rien au modèle s'il est déjà capté par d'autres variables.
+
+### Résultats
+
+| Péril | Modèle | AUC validation | AUC test | Top 10 % test |
+|---|---|---:|---:|---:|
+| Inondation | **LightGBM** | **0,742** | **0,667** | 23,2 % |
+| | Régression logistique | 0,656 | 0,627 | 21,2 % |
+| | Historique de la commune | 0,695 | 0,644 | 23,0 % |
+| Sécheresse | **LightGBM** | **0,903** | **0,752** | 25,4 % |
+| | Régression logistique | 0,890 | 0,733 | 30,8 % |
+| | Historique de la commune | 0,867 | 0,710 | 28,6 % |
+
+- **LightGBM est retenu pour les deux périls**, d'après la validation.
+- En test, il garde la meilleure AUC, mais **pour la sécheresse, la régression logistique capte davantage de communes touchées dans le top 10 %** (30,8 % contre 25,4 %). Ce résultat est conservé tel quel : changer de modèle après avoir vu le test reviendrait à l'utiliser pour choisir.
+
+### Ce que disent les résultats
+
+**1. Une année ne ressemble pas à l'autre.**
+
+| Sécheresse | 2017 | 2018 | 2019 | 2020 | 2021 |
+|---|---:|---:|---:|---:|---:|
+| Communes reconnues | 6,0 % | 11,6 % | 8,3 % | 7,4 % | 0,7 % |
+| AUC LightGBM | 0,88 | 0,70 | 0,72 | 0,68 | 0,80 |
+| Top 10 % | 52 % | 13 % | 18 % | 18 % | 26 % |
+
+- En 2017, les sécheresses touchent les zones habituelles : le modèle les trouve très bien.
+- En 2018-2020, des sécheresses de grande ampleur touchent surtout des communes que l'historique **ne classait pas** parmi les plus exposées : seules 13 % à 18 % des communes reconnues figuraient dans le top 10 %.
+- L'inondation 2024 est elle aussi difficile à prévoir (AUC 0,59), alors que c'est l'année de test où le plus de communes ont été reconnues (7,9 %).
+
+**2. La géographie domine la sécheresse.** Latitude et longitude sont les deux variables les plus influentes (SHAP) : elles servent de substitut à la nature du sol, qui manque au modèle. C'est aussi pour cela que le modèle généralise mal quand les sécheresses se déplacent.
+
+**3. Les probabilités ne sont pas calibrées en absolu.** Sur 2017-2021, le modèle sécheresse annonce en moyenne des probabilités bien inférieures aux fréquences observées, car la sécheresse progresse plus vite que pendant les années d'entraînement (H1). Le modèle est donc utilisé comme un **classement** (`percentile_national`), pas comme une probabilité à prendre au pied de la lettre.
+
+### Limites et pistes
+
+- **Exposition physique :** ajouter la carte d'exposition au retrait-gonflement des argiles (BRGM) et les zones inondables, plutôt que la latitude et la longitude. Ce sont des polygones à croiser avec les contours des communes, d'où un traitement géographique plus lourd.
+- **Recalibrer** les probabilités sur les années récentes, pour les rendre utilisables en tarification.
+- **Horizon pluriannuel :** prédire « au moins une reconnaissance dans les 5 ans » serait moins dépendant de la météo d'une année, et plus proche des besoins d'un assureur.
