@@ -14,11 +14,11 @@ import time
 
 from config import ROOT_DIR
 
-MODELES_PAR_DEFAUT = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
-                      "gemini-3-flash-preview", "gemini-2.5-flash"]
+MODELES_PAR_DEFAUT = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 FICHIER_CLE = ROOT_DIR / "secrets" / "gemini.env"
 PAUSE_ENTRE_APPELS_S = 4          # respecte les quotas du niveau gratuit
 DELAI_APPEL_MS = 90_000            # un appel bloqué est abandonné au bout de 90 s
+ESSAIS_MAX = 15
 
 
 class LLMIndisponible(Exception):
@@ -46,57 +46,51 @@ class Gemini:
         if not cle:
             raise LLMIndisponible("clé Gemini introuvable : voir docs/guide_gemini.md")
         self.client = genai.Client(api_key=cle, http_options=types.HttpOptions(timeout=DELAI_APPEL_MS))
-        self.candidats = [modele or os.environ.get("GEMINI_MODEL")] if (modele or os.environ.get("GEMINI_MODEL")) \
-            else list(MODELES_PAR_DEFAUT)
+        impose = modele or os.environ.get("GEMINI_MODEL")
+        self.candidats = [impose] if impose else list(MODELES_PAR_DEFAUT)
         self.modele = None
         self._dernier_appel = 0.0
 
     def json(self, consigne: str, contenu: str, schema, temperature: float = 0.2) -> dict:
+        """Les modèles gratuits sont parfois saturés (erreur 503 « high demand ») : on alterne
+        entre les modèles disponibles en espaçant les tentatives ; un modèle inexistant (404)
+        est écarté définitivement ; le dernier modèle qui a répondu est essayé en premier."""
         from google.genai import errors, types
 
         config = types.GenerateContentConfig(system_instruction=consigne, temperature=temperature,
                                              response_mime_type="application/json", response_schema=schema)
-        echecs_serveur = 0
-        for essai in range(8):
+        for essai in range(ESSAIS_MAX):
             attente = PAUSE_ENTRE_APPELS_S - (time.time() - self._dernier_appel)
             if attente > 0:
                 time.sleep(attente)
-            modele = self.candidats[0]
+            if not self.candidats:
+                raise LLMIndisponible("aucun modèle Gemini disponible avec cette clé")
+            modele = self.candidats[essai % len(self.candidats)]
             debut = time.time()
             try:
                 self._dernier_appel = time.time()
                 reponse = self.client.models.generate_content(model=modele, contents=contenu, config=config)
+                resultat = json.loads(reponse.text)
+                if self.modele != modele:
+                    self.candidats.remove(modele)
+                    self.candidats.insert(0, modele)
                 self.modele = modele
-                return json.loads(reponse.text)
+                return resultat
             except errors.ClientError as e:
                 print(f"  [gemini] {modele} : erreur {e.code} après {time.time() - debut:.0f} s", flush=True)
-                if e.code == 404 and len(self.candidats) > 1:
-                    self._suivant()
+                if e.code == 404:
+                    self.candidats.remove(modele)
                     continue
-                if e.code == 429:                                  # quota : on patiente
-                    time.sleep(20 * (essai + 1))
-                    continue
-                raise LLMIndisponible(f"erreur Gemini {e.code} : {str(e)[:300]}") from e
+                if e.code != 429:
+                    raise LLMIndisponible(f"erreur Gemini {e.code} : {str(e)[:300]}") from e
             except errors.ServerError as e:
-                print(f"  [gemini] {modele} : erreur serveur {e.code}", flush=True)
-                echecs_serveur += 1
-                if echecs_serveur >= 2 and len(self.candidats) > 1:     # modèle surchargé : on change
-                    self._suivant()
-                    echecs_serveur = 0
-                    continue
-                time.sleep(10)
+                print(f"  [gemini] {modele} : saturé ({e.code})", flush=True)
             except (json.JSONDecodeError, TypeError):
                 print(f"  [gemini] {modele} : réponse non JSON", flush=True)
-                continue
             except Exception as e:                                # délai dépassé, réseau
                 print(f"  [gemini] {modele} : {type(e).__name__} après {time.time() - debut:.0f} s", flush=True)
-                time.sleep(5)
-        raise LLMIndisponible("Gemini n'a pas répondu après plusieurs tentatives")
-
-    def _suivant(self):
-        ancien = self.candidats.pop(0)
-        self.modele = None
-        print(f"  [gemini] {ancien} écarté, essai de {self.candidats[0]}", flush=True)
+            time.sleep(min(60, 5 * 2 ** (essai // max(1, len(self.candidats)))))
+        raise LLMIndisponible(f"Gemini n'a pas répondu après {ESSAIS_MAX} tentatives")
 
 
 class FauxLLM:
