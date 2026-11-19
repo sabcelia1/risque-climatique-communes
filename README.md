@@ -4,6 +4,8 @@
 
 **Statut :** ✅ terminé — 5 étapes, pipeline mis à jour chaque semaine
 
+### 👉 [Ouvrir l'application en ligne](https://risque-catnat.streamlit.app)
+
 [![Pipeline de données](https://github.com/sabcelia1/risque-climatique-communes/actions/workflows/pipeline.yml/badge.svg)](https://github.com/sabcelia1/risque-climatique-communes/actions/workflows/pipeline.yml)
 
 ---
@@ -16,7 +18,7 @@ Choisir une commune pour voir son classement à 1, 3 et 5 ans, ses facteurs de r
 |---|---|
 | ![Page commune](docs/figures/app_commune.png) | ![Carte](docs/figures/app_carte.png) |
 
-Les données de l'application sont exportées chaque semaine par le pipeline (Release [`donnees-app`](https://github.com/sabcelia1/risque-climatique-communes/releases/tag/donnees-app)). Déploiement : [`docs/guide_deploiement.md`](docs/guide_deploiement.md). En local : `lancer_application.bat`, ou `streamlit run app/streamlit_app.py`.
+**En ligne : [risque-catnat.streamlit.app](https://risque-catnat.streamlit.app).** Les données de l'application sont exportées chaque semaine par le pipeline (Release [`donnees-app`](https://github.com/sabcelia1/risque-climatique-communes/releases/tag/donnees-app)). Déploiement : [`docs/guide_deploiement.md`](docs/guide_deploiement.md). En local : `lancer_application.bat`, ou `streamlit run app/streamlit_app.py`.
 
 ## 🎯 Problématique
 
