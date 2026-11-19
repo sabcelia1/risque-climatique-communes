@@ -4,12 +4,14 @@ import pandas as pd
 import streamlit as st
 
 import donnees as d
+import style
 
 GITHUB = f"https://github.com/{d.DEPOT}"
 
 
 def page():
-    st.title("Méthode et limites")
+    style.bandeau("Méthode et limites", "D'où viennent les chiffres, ce que vaut le modèle, "
+                  "et ce qu'il ne sait pas faire.", surtitre="Transparence")
     st.markdown(f"""
 **Les données.** Base [GASPAR](https://www.data.gouv.fr/datasets/base-nationale-de-gestion-assistee-des-procedures-administratives-relatives-aux-risques-gaspar)
 des arrêtés de catastrophe naturelle (ministère de la Transition écologique, depuis 1982), référentiel des

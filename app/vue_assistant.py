@@ -3,6 +3,7 @@
 import streamlit as st
 
 import donnees as d
+import style
 
 EXEMPLES = [
     "Quelles sont les 10 communes du Gers les plus exposées à la sécheresse à 5 ans ?",
@@ -20,7 +21,8 @@ def repondre(question: str) -> dict:
 
 
 def page():
-    st.title("Interroger les données en français")
+    style.bandeau("Interroger les données en français", "Posez une question : l'IA écrit la requête SQL, "
+                  "des garde-fous la vérifient, et la réponse est contrôlée.", surtitre="Assistant IA")
     st.caption("Gemini traduit la question en SQL. La requête n'est exécutée qu'après des garde-fous : lecture "
                "seule, tables du projet uniquement, aucun accès aux fichiers, durée et nombre de lignes plafonnés. "
                "Le résumé n'est affiché que si ses chiffres figurent dans le résultat.")

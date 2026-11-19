@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 import donnees as d
+import style
 
 PERILS = {"secheresse": "Sécheresse", "inondation": "Inondation"}
 COULEURS = {"inondation": "#1f6f8b", "secheresse": "#d08c2b", "mouvement_terrain": "#7a6a58",
@@ -34,8 +35,9 @@ def choisir_commune() -> pd.Series:
 
 
 def page():
-    st.title("Risque de catastrophe naturelle par commune")
-    st.caption("Reconnaissances CatNat depuis 1982, exposition des sols aux argiles et risque prédit à 1, 3 et 5 ans.")
+    style.bandeau("Quel risque de catastrophe naturelle pour votre commune ?",
+                  "Reconnaissances CatNat depuis 1982, exposition des sols aux argiles et risque prédit "
+                  "à 1, 3 et 5 ans pour les 34\u202f969 communes de France.")
     c = choisir_commune()
     code = c["code_insee"]
     info = d.requete("select * from communes where code_insee = ?", [code]).iloc[0]
@@ -53,8 +55,9 @@ def page():
         p5 = preds[(preds["famille_peril"] == peril) & (preds["horizon_ans"] == 5)]
         col.metric(f"{PERILS[peril]}, 5 ans", top(p5["percentile_national"].iloc[0]) if len(p5) else "—",
                    help="Rang national de la commune : « Top 3 % » = parmi les 3 % de communes les plus exposées.")
-    k3.metric("Reconnaissances depuis 1982", int(info["nb_evenements_total"]))
-    k4.metric("Sol argileux, exposition forte",
+    k3.metric("CatNat depuis 1982", int(info["nb_evenements_total"]),
+              help="Nombre de reconnaissances de catastrophe naturelle, tous périls, depuis 1982.")
+    k4.metric("Argile forte",
               "Non cartographié" if pd.isna(info["part_argile_fort"]) else f"{round(100 * info['part_argile_fort'])} %",
               help="Part du territoire en exposition forte au retrait-gonflement des argiles (BRGM, 2019).")
 
