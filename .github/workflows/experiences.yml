@@ -10,6 +10,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
-      - run: pip install -r requirements.txt
-      - run: python src/ingest.py && python src/clean.py > /dev/null && python src/lancer_dbt.py local > /dev/null
-      - run: python experiences/comparer.py
+      - run: pip install requests
+      - run: python experiences/chercher_sources.py
