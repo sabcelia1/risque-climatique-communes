@@ -44,7 +44,8 @@ Règles :
 - Les parts (part_argile_*, probabilite, percentile_national) sont entre 0 et 1.
 - Pour « les plus exposées / à risque », trier par percentile_national décroissant.
 - Toujours inclure le nom des communes quand le résultat porte sur des communes.
-- Limiter à 50 lignes au plus."""
+- Si la question demande un seul élément (« quel est le… », « quelle région a le plus… »),
+  renvoyer une seule ligne (LIMIT 1) ; sinon, limiter à 50 lignes au plus."""
 
 CONSIGNE_RESUME = """Tu réponds en français, en une à trois phrases, à une question à partir du
 RÉSULTAT d'une requête. N'utilise que le résultat. Recopie les nombres exactement comme ils

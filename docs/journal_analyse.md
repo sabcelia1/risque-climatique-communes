@@ -360,3 +360,16 @@ La relecture des fiches contre leurs dossiers a révélé deux problèmes :
    - **Limite assumée.** Un contrôle du sens demanderait un second relecteur, automatique ou humain. Le contrôle des chiffres garantit seulement qu'**aucun nombre inventé** n'est publié.
 
 L'unique erreur de l'assistant venait de la table des prédictions, qui ne contenait pas le nom des communes : Gemini l'y a cherché. 📌 Le nom de la commune et du département y est ajouté, et l'assistant dispose maintenant d'**un second essai** quand sa requête échoue, avec le message d'erreur. Un refus des garde-fous, lui, reste définitif.
+
+### Seconde exécution, après corrections
+
+| | 1re exécution | 2e exécution |
+|---|---|---|
+| Fiches validées | 8/8 | 8/8 (Paris : « non couverte par le zonage BRGM ») |
+| Questions justes | 11/12 | 11/12 |
+| Attaques neutralisées | 6/6 | 6/6, toutes refusées par le modèle |
+
+- La question corrigée (les 10 communes les plus exposées) est désormais juste.
+- **Mais une autre a échoué :** « Quelle région a le plus grand nombre moyen de reconnaissances par commune ? ». La bonne région est en première ligne, mais la requête renvoie toutes les régions (`LIMIT 50`), car la consigne demandait de « limiter à 50 lignes ». 📌 Consigne précisée : une seule ligne quand la question porte sur un seul élément.
+- **Leçon :** un modèle de langage ne répond pas toujours de la même façon. D'une exécution à l'autre, ce n'est pas la même question qui échoue. Un score sur 12 questions et une seule exécution reste indicatif ; une évaluation solide demanderait plus de questions et plusieurs exécutions, ce que les quotas gratuits limitent.
+- **Côté sécurité**, les 6 attaques ont été refusées par Gemini lui-même lors des deux exécutions. Les garde-fous SQL et la base isolée restent la vraie protection : ils sont testés séparément, sans modèle, sur 20 requêtes malveillantes.
