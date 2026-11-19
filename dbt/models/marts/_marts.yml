@@ -44,6 +44,19 @@ models:
               arguments:
                 values: [0, 1]
                 quote: false
+      - name: cible_3ans
+        description: 1 si au moins une reconnaissance entre l'année et l'année + 2.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: cible_5ans
+        description: 1 si au moins une reconnaissance entre l'année et l'année + 4.
+      - name: annee_evaluable_3ans
+        description: Vrai si les 3 années de la fenêtre sont complètes.
+      - name: annee_evaluable_5ans
+        description: Vrai si les 5 années de la fenêtre sont complètes.
       - name: famille_peril
         data_tests:
           - accepted_values:
