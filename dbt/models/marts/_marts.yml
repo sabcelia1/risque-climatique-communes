@@ -59,5 +59,7 @@ models:
         description: >
           Vrai pour l'année qui suit la dernière année étudiée (annee_fin + 1) : ses
           variables sont connues, sa cible ne l'est pas encore. Le modèle prédit ces lignes.
-      - name: taux_dept_annee_prec
-        description: Part des communes du département touchées l'année précédente.
+      - name: taux_dept_5ans
+        description: >
+          Fréquence annuelle moyenne de reconnaissance dans le département sur les
+          5 dernières années, d'après les seuls arrêtés connus au 1er janvier.

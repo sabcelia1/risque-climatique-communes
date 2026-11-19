@@ -24,7 +24,7 @@ def table_factice(n_communes=60, annees=range(1992, 2026), graine=0):
                     "nb_evt_depuis_debut": int(risque * (a - 1982)), "nb_evt_1an": 0,
                     "nb_evt_5ans": int(risque * 5), "nb_evt_10ans": int(risque * 10),
                     "annees_depuis_derniere": np.nan, "nb_evt_autres_perils_10ans": 0,
-                    "taux_dept_annee_prec": 0.1, "population": 1000, "surface_km2": 10.0,
+                    "taux_dept_5ans": 0.1, "population": 1000, "surface_km2": 10.0,
                     "densite_hab_km2": 100.0, "latitude": 45.0, "longitude": 2.0,
                     "annee_evaluable": a <= (2024 if famille == "inondation" else 2021),
                     "historique_complet": True, "annee_a_predire": a == 2025})

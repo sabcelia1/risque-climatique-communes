@@ -28,7 +28,8 @@ ANNEE_DEBUT = 1982
 FIGURES_DIR = REPORTS_DIR / "figures"
 MODELS_DIR = ROOT_DIR / "models"
 
-# Variables explicatives : toutes calculées sur les années ANTÉRIEURES (test dbt anti-fuite)
+# Variables explicatives : calculées « à date », avec les seuls arrêtés signés avant le
+# 1er janvier de l'année prédite (test dbt anti-fuite)
 VARIABLES = {
     "nb_evt_1an": "Reconnaissances l'année précédente",
     "nb_evt_5ans": "Reconnaissances sur 5 ans",
@@ -36,7 +37,7 @@ VARIABLES = {
     "taux_historique": "Fréquence depuis 1982 (par an)",
     "annees_depuis_derniere": "Années depuis la dernière reconnaissance",
     "nb_evt_autres_perils_10ans": "Autres périls sur 10 ans",
-    "taux_dept_annee_prec": "Part du département touchée l'année précédente",
+    "taux_dept_5ans": "Fréquence dans le département (5 ans)",
     "population": "Population",
     "surface_km2": "Superficie (km²)",
     "densite_hab_km2": "Densité (hab./km²)",
