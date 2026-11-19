@@ -62,8 +62,19 @@ def repondre(llm, con, question: str) -> dict:
     try:
         df = executer(con, sortie["sql"])
     except RequeteRefusee as e:
-        sortie["statut"] = f"bloquée par les garde-fous : {e}"
-        return sortie
+        if not str(e).startswith("exécution impossible"):          # refus de sécurité : définitif
+            sortie["statut"] = f"bloquée par les garde-fous : {e}"
+            return sortie
+        # Erreur SQL (colonne inexistante…) : un second essai, avec le message d'erreur
+        trad = llm.json(CONSIGNE_SQL.format(schema=schema_texte()),
+                        f"Question : {question}\nTa requête précédente :\n{sortie['sql']}\n"
+                        f"a échoué avec l'erreur : {e}\nCorrige-la.", Traduction)
+        sortie.update(sql=trad.get("sql", "").strip(), explication=trad.get("explication", ""), corrigee=True)
+        try:
+            df = executer(con, sortie["sql"])
+        except RequeteRefusee as e2:
+            sortie["statut"] = f"bloquée par les garde-fous : {e2}"
+            return sortie
     sortie["statut"] = "exécutée"
     sortie["resultat"] = df
     lignes = json.loads(df.head(30).to_json(orient="records", force_ascii=False, date_format="iso"))

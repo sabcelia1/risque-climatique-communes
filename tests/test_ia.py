@@ -157,3 +157,21 @@ def test_comparaison_des_resultats():
     assert evaluer_assistant.correspond(ref, pd.DataFrame({"nombre": [3], "libelle": ["x"]}))
     assert not evaluer_assistant.correspond(ref, pd.DataFrame({"n": [4]}))
     assert evaluer_assistant.correspond(pd.DataFrame({"c": ["Nice", "Auch"]}), pd.DataFrame({"x": ["auch", "nice"]}))
+
+
+def test_assistant_corrige_une_requete_en_erreur(base):
+    con = base_ia.base_isolee()
+    llm = FauxLLM([{"sql": "select nom_inexistant from communes", "explication": "."},
+                   {"sql": "select nom_commune from communes order by nb_evenements_total desc limit 1", "explication": "."},
+                   {"reponse": "Auch."}])
+    r = assistant_sql.repondre(llm, con, "Quelle commune a le plus de reconnaissances ?")
+    assert r["statut"] == "exécutée" and r.get("corrigee") and "nom_inexistant" in llm.appels[1]
+    r = assistant_sql.repondre(FauxLLM([{"sql": "drop table communes", "explication": "."}]), con, "...")
+    assert r["statut"].startswith("bloquée") and not r.get("corrigee")      # pas de second essai
+
+
+def test_paris_non_couverte_par_le_zonage_argiles():
+    import csv
+    chemin = Path(__file__).resolve().parents[1] / "dbt" / "seeds" / "exposition_argiles.csv"
+    paris = [l for l in csv.DictReader(open(chemin, encoding="utf-8")) if l["code_insee"] == "75056"]
+    assert paris and paris[0]["part_argile_fort"] == ""

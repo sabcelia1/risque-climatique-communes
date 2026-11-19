@@ -89,6 +89,8 @@ def main() -> int:
         "part_argile_moyen": parts[2].round(3).values,
         "part_argile_fort": parts[3].round(3).values,
     })
+    # Le zonage BRGM ne couvre pas Paris : « non cartographié » n'est pas « non exposé »
+    sortie.loc[sortie["code_insee"].str.startswith("75"), sortie.columns[1:4]] = float("nan")
     sortie["indice_argile"] = (sortie["part_argile_faible"] + 2 * sortie["part_argile_moyen"]
                                + 3 * sortie["part_argile_fort"]).round(3)
     SORTIE.parent.mkdir(parents=True, exist_ok=True)

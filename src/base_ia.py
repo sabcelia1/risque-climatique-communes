@@ -53,14 +53,16 @@ TABLES = {
                        "et horizon (1, 3 ou 5 ans à partir de l'année indiquée). La probabilité est indicative ; "
                        "le percentile national (0 à 1, 1 = plus exposée) est le résultat fiable.",
         "colonnes": {
-            "code_insee": "code INSEE", "annee": "année de départ de la prédiction",
+            "code_insee": "code INSEE", "nom_commune": "nom de la commune", "nom_departement": "nom du département",
+            "annee": "année de départ de la prédiction",
             "famille_peril": "'inondation' ou 'secheresse'", "horizon_ans": "1, 3 ou 5",
             "probabilite": "probabilité indicative d'au moins une reconnaissance sur l'horizon (0 à 1)",
             "percentile_national": "rang de la commune parmi toutes les communes (0 à 1)",
             "facteur_1": "variable qui pèse le plus dans la prédiction",
         },
-        "sql": """select code_insee, annee, famille_peril, horizon_ans, probabilite, percentile_national, facteur_1
-                  from read_parquet('{predictions}')""",
+        "sql": """select p.code_insee, c.nom_commune, c.nom_departement, p.annee, p.famille_peril, p.horizon_ans,
+                         p.probabilite, p.percentile_national, p.facteur_1
+                  from read_parquet('{predictions}') p left join src.dim_commune c using (code_insee)""",
     },
 }
 

@@ -5,7 +5,8 @@ seeds:
     description: >
       Part du territoire de chaque commune métropolitaine en exposition faible, moyenne
       ou forte au retrait-gonflement des argiles (zonage BRGM 2019, Géorisques), estimée
-      par 200 points tirés au hasard par commune. Produite par src/exposition_argiles.py.
+      par 200 points tirés au hasard par commune. Paris n'est pas couverte par le zonage :
+      valeurs vides. Produite par src/exposition_argiles.py.
     columns:
       - name: code_insee
         data_tests: [unique, not_null]
