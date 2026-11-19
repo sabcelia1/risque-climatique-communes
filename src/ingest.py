@@ -9,6 +9,7 @@ import argparse
 import io
 import json
 import sys
+import time
 import zipfile
 from datetime import datetime, timezone
 
@@ -21,7 +22,23 @@ FICHIERS = {"gaspar": "catnat_gaspar.csv", "communes": "communes.json"}
 CHUNK = 1024 * 1024
 
 
+ESSAIS = 4
+
+
 def telecharger(url: str) -> bytes:
+    """Télécharge avec plusieurs tentatives : data.gouv.fr répond parfois lentement."""
+    for essai in range(1, ESSAIS + 1):
+        try:
+            return _telecharger(url)
+        except (requests.ConnectionError, requests.Timeout) as erreur:
+            if essai == ESSAIS:
+                raise
+            attente = 30 * essai
+            print(f"\n  échec ({type(erreur).__name__}), nouvel essai dans {attente} s...")
+            time.sleep(attente)
+
+
+def _telecharger(url: str) -> bytes:
     with requests.get(url, stream=True, timeout=TIMEOUT) as resp:
         resp.raise_for_status()
         total = int(resp.headers.get("content-length", 0))
