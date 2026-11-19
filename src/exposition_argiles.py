@@ -1,11 +1,11 @@
-"""Exposition de chaque commune au retrait-gonflement des argiles (aléa BRGM).
+"""Exposition de chaque commune au retrait-gonflement des argiles (zonage BRGM 2019).
 
 Calcul ponctuel (la géologie ne change pas) : on tire des points au hasard dans
 chaque commune, et on regarde dans quelle zone d'aléa ils tombent. La part des
 points donne la part du territoire en aléa faible, moyen ou fort.
 
 Sources (Licence Ouverte) :
-  - aléa retrait-gonflement des argiles, BRGM / Géorisques ;
+  - zonage d'exposition au retrait-gonflement des argiles (BRGM, 2019), via Géorisques ;
   - contours des communes, Etalab (découpage administratif).
 Résultat : data/reference/exposition_argiles.csv, versionné dans le dépôt.
 
@@ -13,6 +13,7 @@ Usage (lourd : ~1 Go à télécharger, lancé par GitHub Actions) :
     python src/exposition_argiles.py
 """
 
+import gzip
 import io
 import sys
 import tempfile
@@ -64,7 +65,7 @@ def main() -> int:
         alea = alea[alea["niveau"] > 0][["niveau", "geometry"]].to_crs(2154)
 
     print("Téléchargement des contours des communes...")
-    communes = gpd.read_file(io.BytesIO(telecharger(URL_COMMUNES)))
+    communes = gpd.read_file(io.BytesIO(gzip.decompress(telecharger(URL_COMMUNES))))
     code = next(c for c in ("code", "INSEE_COM", "insee") if c in communes.columns)
     communes = communes[[code, "geometry"]].rename(columns={code: "code_insee"}).to_crs(2154)
     communes = communes[~communes["code_insee"].str.startswith("97")]          # métropole seulement
