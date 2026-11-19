@@ -5,11 +5,12 @@ on:
 jobs:
   essais:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 20
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
-      - run: pip install -r requirements.txt
-      - run: python src/ingest.py && python src/clean.py > /dev/null && python src/lancer_dbt.py local > /dev/null
-      - run: python experiences/diagnostic_horizons.py
+      - run: pip install google-genai pydantic
+      - run: python -u experiences/diagnostic_gemini.py
