@@ -55,5 +55,9 @@ models:
           y est sous-estimée, ces lignes ne servent ni à l'entraînement ni au test.
       - name: historique_complet
         description: Vrai quand 10 années d'historique sont disponibles (à partir de 1992).
+      - name: annee_a_predire
+        description: >
+          Vrai pour l'année qui suit la dernière année étudiée (annee_fin + 1) : ses
+          variables sont connues, sa cible ne l'est pas encore. Le modèle prédit ces lignes.
       - name: taux_dept_annee_prec
         description: Part des communes du département touchées l'année précédente.

@@ -68,7 +68,8 @@ select
 
     -- Indicateurs d'usage pour la modélisation
     h.annee <= {{ derniere_annee_evaluable('h.famille_peril') }}   as annee_evaluable,
-    h.annee >= {{ var('annee_debut') + var('annees_historique_min') }} as historique_complet
+    h.annee >= {{ var('annee_debut') + var('annees_historique_min') }} as historique_complet,
+    h.annee = {{ var('annee_fin') + 1 }}                           as annee_a_predire
 from historique as h
 inner join {{ ref('stg_communes') }} as c
   on c.code_insee = h.code_insee

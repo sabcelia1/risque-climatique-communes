@@ -30,7 +30,11 @@ echo === Etape 3 : exploration
 
 echo.
 echo === Etape 4 : modeles dbt et tests, en local (DuckDB)
-".venv\Scripts\python.exe" src\lancer_dbt.py local || goto :erreur
+.venv\Scripts\python.exe" src\lancer_dbt.py local || goto :erreur
+
+echo.
+echo === Etape 5 : modele de prediction (LightGBM, SHAP)
+".venv\Scripts\python.exe" src\modele.py || goto :erreur
 
 ".venv\Scripts\python.exe" src\gcp.py
 if errorlevel 1 (
@@ -40,16 +44,16 @@ if errorlevel 1 (
 )
 
 echo.
-echo === Etape 5 : chargement dans BigQuery
+echo === Etape 6 : chargement dans BigQuery
 ".venv\Scripts\python.exe" src\load_bigquery.py || goto :erreur
 
 echo.
-echo === Etape 6 : modeles dbt et tests dans BigQuery
+echo === Etape 7 : modeles dbt et tests dans BigQuery
 ".venv\Scripts\python.exe" src\lancer_dbt.py bigquery || goto :erreur
 
 :fin
 echo.
-echo === Termine ! Rapports : reports\qualite_donnees.md et reports\exploration.md
+echo === Termine ! Rapports : reports\qualite_donnees.md, reports\exploration.md et reports\modele.md
 pause
 exit /b 0
 

@@ -13,6 +13,7 @@ from config import PROCESSED_DIR
 from gcp import DATASET_RAW, LOCALISATION, configurer
 
 TABLES = ["communes", "catnat"]
+OPTIONNELLES = ["predictions"]     # produite par src/modele.py (étape 3)
 
 
 def main() -> int:
@@ -35,7 +36,8 @@ def main() -> int:
 
     config = bigquery.LoadJobConfig(source_format=bigquery.SourceFormat.PARQUET,
                                     write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE)
-    for table in TABLES:
+    presentes = [t for t in OPTIONNELLES if (PROCESSED_DIR / f"{t}.parquet").exists()]
+    for table in TABLES + presentes:
         cible = f"{projet}.{DATASET_RAW}.{table}"
         with open(PROCESSED_DIR / f"{table}.parquet", "rb") as f:
             client.load_table_from_file(f, cible, job_config=config).result()

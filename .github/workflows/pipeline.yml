@@ -50,6 +50,9 @@ jobs:
       - name: Modèles dbt et tests (DuckDB)
         run: python src/lancer_dbt.py local
 
+      - name: Modèle de prédiction (LightGBM, SHAP)
+        run: python src/modele.py
+
       - name: Connexion à Google Cloud (fédération d'identité, sans clé)
         if: env.GCP_WIF_PROVIDER != ''
         uses: google-github-actions/auth@v2
@@ -70,5 +73,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rapports
-          path: reports/
+          path: |
+            reports/
+            data/processed/predictions.parquet
           if-no-files-found: ignore

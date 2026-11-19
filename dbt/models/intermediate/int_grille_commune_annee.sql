@@ -1,8 +1,9 @@
 -- Grille complète commune x année x famille modélisée, avec des zéros les années
 -- sans reconnaissance : indispensable pour que « 5 lignes précédentes » signifie
 -- bien « 5 années précédentes » dans les fenêtres glissantes.
+-- La grille va jusqu'à annee_fin + 1 : c'est l'année à prédire (cible inconnue).
 with annees as (
-    {{ serie_annees(var('annee_debut'), var('annee_fin')) }}
+    {{ serie_annees(var('annee_debut'), var('annee_fin') + 1) }}
 ),
 
 familles as (

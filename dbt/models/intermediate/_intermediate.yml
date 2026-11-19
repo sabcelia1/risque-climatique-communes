@@ -8,7 +8,7 @@ models:
         description: Jours entre le début de l'événement et la signature de l'arrêté.
 
   - name: int_grille_commune_annee
-    description: Une ligne par commune, année et famille modélisée (sécheresse, inondation), zéros compris.
+    description: Une ligne par commune, année (jusqu'à l'année à prédire) et famille modélisée (sécheresse, inondation), zéros compris.
     data_tests:
       - lignes_uniques:
           arguments:
