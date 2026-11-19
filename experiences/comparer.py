@@ -91,16 +91,59 @@ def references(nom, data, famille):
         print(f"  [{nom}] {jeu:<10} historique auc {h['auc_moyen_par_annee']:.3f} top10 {h['top10_moyen_par_annee']:.1%}"
               f" | logistique auc {l['auc_moyen_par_annee']:.3f} top10 {l['top10_moyen_par_annee']:.1%}")
 
-SANS_GEO = [v for v in m.VARIABLES if v not in ("latitude", "longitude")]
+
+# --- Variables de prévention datées (PPRN, AZI) -----------------------------------------
+import io, zipfile
+from config import SOURCES
+from ingest import telecharger
+z = zipfile.ZipFile(io.BytesIO(telecharger(SOURCES["gaspar"]["url"])))
+lire = lambda motif: pd.read_csv(z.open(next(n for n in z.namelist() if motif in n)), sep=";", dtype=str)
+pprn, azi = lire("pprn_"), lire("azi_")
+pprn["code_insee"] = pprn["CODE INSEE COMMUNE"].str.zfill(5)
+argile = (pprn["LIBELLE RISQUE 3"].eq("Tassements différentiels")
+          | pprn["LIBELLE MODELE"].str.contains("Argile", na=False))
+inond = pprn["LIBELLE RISQUE 2"].eq("Inondation")
+def an(c): return pd.to_datetime(c, errors="coerce").dt.year
+mesures = pd.concat([
+    pd.DataFrame({"code_insee": pprn["code_insee"], "famille_peril": "inondation", "type": "ppr_prescrit",
+                  "annee_mesure": an(pprn["PRESCRIPTION"])})[inond],
+    pd.DataFrame({"code_insee": pprn["code_insee"], "famille_peril": "inondation", "type": "ppr_approuve",
+                  "annee_mesure": an(pprn["APPROBATION"])})[inond],
+    pd.DataFrame({"code_insee": pprn["code_insee"], "famille_peril": "secheresse", "type": "ppr_prescrit",
+                  "annee_mesure": an(pprn["PRESCRIPTION"])})[argile],
+    pd.DataFrame({"code_insee": pprn["code_insee"], "famille_peril": "secheresse", "type": "ppr_approuve",
+                  "annee_mesure": an(pprn["APPROBATION"])})[argile],
+    pd.DataFrame({"code_insee": azi["cod_commune"].str.zfill(5), "famille_peril": "inondation", "type": "azi",
+                  "annee_mesure": an(azi["dat_diffusion"])}),
+]).dropna()
+premiere = mesures.groupby(["code_insee", "famille_peril", "type"])["annee_mesure"].min().unstack()
+print("\nCommunes concernées :", premiere.notna().groupby(level="famille_peril").sum().to_dict())
+
+def avec_prevention(data):
+    out = data.merge(premiere.reset_index(), on=["code_insee", "famille_peril"], how="left")
+    for t in ("ppr_prescrit", "ppr_approuve", "azi"):
+        out[t] = ((out[t] < out["annee"]) if t in out else False).astype(float)   # connu au 1er janvier
+    return out
+
+pitp = avec_prevention(pit)
+AVEC = list(m.VARIABLES) + ["ppr_prescrit", "ppr_approuve", "azi"]
+VARS_ETENDUES = {**m.VARIABLES, "ppr_prescrit": "PPR prescrit", "ppr_approuve": "PPR approuvé", "azi": "Atlas des zones inondables"}
+
+def evaluer_config2(nom, data, famille, params, variables):
+    vars_orig = m.VARIABLES
+    m.VARIABLES = {k: VARS_ETENDUES[k] for k in variables}
+    try:
+        return evaluer_config(nom, data, famille, params)
+    finally:
+        m.VARIABLES = vars_orig
+
 for famille in ("inondation", "secheresse"):
-    print(f"\n===== {famille} (validation {m.DECOUPAGE[famille]['validation']}, test {m.DECOUPAGE[famille]['test']})")
-    references("actuel", df, famille)
-    references("à date", pit, famille)
-    evaluer_config("A actuel", df, famille, PARAMS_BASE)
-    evaluer_config("B régularisé", df, famille, PARAMS_REG)
-    evaluer_config("C fenêtre 12 ans", df, famille, PARAMS_BASE, fenetre=12)
-    evaluer_config("D régularisé + fenêtre 12 ans", df, famille, PARAMS_REG, fenetre=12)
-    evaluer_config("E à date", pit, famille, PARAMS_BASE)
-    evaluer_config("F à date + régularisé", pit, famille, PARAMS_REG)
-    evaluer_config("G à date + régularisé + fenêtre 12", pit, famille, PARAMS_REG, fenetre=12)
-    evaluer_config("H à date + régularisé, sans lat/long", pit, famille, PARAMS_REG, variables=SANS_GEO)
+    print(f"\n===== {famille}")
+    sous = pitp[(pitp.famille_peril == famille) & pitp.annee.between(2015, 2021)]
+    for t in ("ppr_prescrit", "ppr_approuve", "azi"):
+        g = sous.groupby(t)["cible"].mean()
+        if len(g) == 2:
+            print(f"  taux de reconnaissance 2015-2021 : {t}=0 {g[0]:.1%} | {t}=1 {g[1]:.1%} (part communes {sous[t].mean():.0%})")
+    evaluer_config2("E à date", pitp, famille, PARAMS_BASE, list(m.VARIABLES))
+    evaluer_config2("I à date + prévention", pitp, famille, PARAMS_BASE, AVEC)
+    evaluer_config2("J à date + prévention, régularisé", pitp, famille, PARAMS_REG, AVEC)
