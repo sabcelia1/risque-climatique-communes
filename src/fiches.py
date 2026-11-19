@@ -57,6 +57,8 @@ def pourcent(x) -> str:
 
 def valeur_facteur(nom, valeur) -> str | None:
     _, nature = LIBELLES_FACTEURS.get(nom, (nom, "aucune"))
+    if nature == "part" and (valeur is None or (isinstance(valeur, float) and math.isnan(valeur))):
+        return "non cartographiée (hors zonage BRGM)"
     if valeur is None or (isinstance(valeur, float) and math.isnan(valeur)) or nature == "aucune":
         return None
     return {"nombre": lambda v: entier(v), "par_an": lambda v: f"{decimal(v, 2)} par an",

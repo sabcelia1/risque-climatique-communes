@@ -2,11 +2,21 @@
 
 > Prévoir quelles communes françaises risquent une catastrophe naturelle reconnue (inondation, sécheresse, mouvement de terrain…), expliquer pourquoi, et produire des fiches de risque lisibles par un assureur grâce à l'IA générative.
 
-**Statut :** 🚧 en cours — étape 4/5 terminée (IA générative)
+**Statut :** ✅ terminé — 5 étapes, pipeline mis à jour chaque semaine
 
 [![Pipeline de données](https://github.com/sabcelia1/risque-climatique-communes/actions/workflows/pipeline.yml/badge.svg)](https://github.com/sabcelia1/risque-climatique-communes/actions/workflows/pipeline.yml)
 
 ---
+
+## 🖥️ L'application
+
+Choisir une commune pour voir son classement à 1, 3 et 5 ans, ses facteurs de risque, son historique et sa fiche rédigée par l'IA ; explorer la carte de France ; interroger les données en français.
+
+| Une commune | La carte du risque sécheresse à 5 ans |
+|---|---|
+| ![Page commune](docs/figures/app_commune.png) | ![Carte](docs/figures/app_carte.png) |
+
+Les données de l'application sont exportées chaque semaine par le pipeline (Release [`donnees-app`](https://github.com/sabcelia1/risque-climatique-communes/releases/tag/donnees-app)). Déploiement : [`docs/guide_deploiement.md`](docs/guide_deploiement.md). En local : `lancer_application.bat`, ou `streamlit run app/streamlit_app.py`.
 
 ## 🎯 Problématique
 
@@ -24,7 +34,7 @@ Ce projet construit, à partir de données publiques :
 - [x] **Étape 2** — Data engineering : modèles dbt dans BigQuery, 30 tests de données dont un test anti-fuite, mise à jour hebdomadaire (GitHub Actions)
 - [x] **Étape 3** — Machine learning : LightGBM par péril à 1, 3 et 5 ans, exposition aux argiles, validation temporelle, variables « à date », explicabilité (SHAP)
 - [x] **Étape 4** — IA générative (Gemini) : fiches de risque dont chaque chiffre est vérifié, assistant question → SQL avec garde-fous et évaluation
-- [ ] **Étape 5** — Application Streamlit en ligne, documentation
+- [x] **Étape 5** — Application Streamlit : fiche par commune, carte de France, assistant en langage naturel
 
 ## 📁 Sources de données
 
@@ -55,7 +65,10 @@ flowchart LR
     F --> G[(BigQuery<br/>risque)]
     F --> H[modele.py<br/>LightGBM + SHAP]
     H -->|prédictions| E
-    G --> I[IA générative<br/>étape 4]
+    K[BRGM<br/>zonage argiles] --> F
+    H --> X[exporter_app.py<br/>Release donnees-app]
+    X --> S[Application Streamlit]
+    S <--> I[Gemini<br/>fiches + assistant SQL]
     J[GitHub Actions<br/>chaque lundi] -.-> C
 ```
 
@@ -154,7 +167,7 @@ Les règles de nettoyage sont couvertes par des **tests unitaires** (`tests/`), 
 
 ## 🚀 Reproduire le projet
 
-**Windows :** double-cliquez sur `lancer.bat` (environnement, tests, téléchargement, nettoyage, exploration, modèles dbt, modèle de prédiction). Pour BigQuery, suivez d'abord le [guide de connexion](docs/guide_gcp.md).
+**Windows :** double-cliquez sur `lancer.bat` (environnement, tests, téléchargement, nettoyage, exploration, modèles dbt, modèle de prédiction, export de l'application), puis sur `lancer_application.bat`. Pour BigQuery, suivez d'abord le [guide de connexion](docs/guide_gcp.md).
 
 **Manuellement :**
 
@@ -175,6 +188,10 @@ python src/modele.py               # modèle, SHAP, prédictions -> reports/mode
 # IA générative (clé Gemini, voir docs/guide_gemini.md) :
 python src/fiches.py 32013 06088   # fiches de risque -> reports/fiches.md
 python src/assistant_sql.py "Quelles communes du Gers sont les plus exposées aux argiles ?"
+
+# Application :
+python src/exporter_app.py         # export compact -> app/donnees/
+streamlit run app/streamlit_app.py
 
 # Avec un accès Google Cloud (docs/guide_gcp.md) :
 python src/load_bigquery.py        # chargement dans BigQuery

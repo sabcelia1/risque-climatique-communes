@@ -113,8 +113,10 @@ def fiche_gemini(c, code):
                "vérifié automatiquement : un nombre absent des données entraîne un second essai, puis le rejet.")
     cle = f"fiche_{code}"
     exemple = d.json_publie("fiches_exemples.json").get(c["nom_commune"])
-    if exemple and exemple["faits"].get("departement", "").endswith(f"({c['code_departement']})"):
-        st.session_state.setdefault(cle, exemple)
+    # Une fiche d'exemple n'est affichée que si son dossier correspond encore aux données du
+    # jour (les prédictions sont recalculées chaque semaine, les exemples non)
+    if exemple and cle not in st.session_state and exemple["faits"] == dossier(d.base().cursor(), code):
+        st.session_state[cle] = exemple
     if cle not in st.session_state:
         if not d.cle_gemini_disponible():
             st.info("La rédaction par Gemini n'est pas activée sur cette installation.")
