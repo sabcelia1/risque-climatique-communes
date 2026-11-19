@@ -2,7 +2,7 @@
 
 > Prévoir quelles communes françaises risquent une catastrophe naturelle reconnue (inondation, sécheresse, mouvement de terrain…), expliquer pourquoi, et produire des fiches de risque lisibles par un assureur grâce à l'IA générative.
 
-**Statut :** 🚧 en cours — étape 3/5 terminée (machine learning)
+**Statut :** 🚧 en cours — étape 4/5 terminée (IA générative)
 
 [![Pipeline de données](https://github.com/sabcelia1/risque-climatique-communes/actions/workflows/pipeline.yml/badge.svg)](https://github.com/sabcelia1/risque-climatique-communes/actions/workflows/pipeline.yml)
 
@@ -23,7 +23,7 @@ Ce projet construit, à partir de données publiques :
 - [x] **Étape 1** — Ingestion et qualité : base GASPAR, référentiel des communes, tests unitaires
 - [x] **Étape 2** — Data engineering : modèles dbt dans BigQuery, 30 tests de données dont un test anti-fuite, mise à jour hebdomadaire (GitHub Actions)
 - [x] **Étape 3** — Machine learning : LightGBM par péril à 1, 3 et 5 ans, exposition aux argiles, validation temporelle, variables « à date », explicabilité (SHAP)
-- [ ] **Étape 4** — IA générative : fiches de risque contrôlées, assistant en langage naturel
+- [x] **Étape 4** — IA générative (Gemini) : fiches de risque dont chaque chiffre est vérifié, assistant question → SQL avec garde-fous et évaluation
 - [ ] **Étape 5** — Application Streamlit en ligne, documentation
 
 ## 📁 Sources de données
@@ -108,6 +108,34 @@ Pour chaque commune et chaque péril, des modèles **LightGBM** estiment le risq
 
 ![Importance des variables (SHAP)](docs/figures/importance_shap.png)
 
+## ✍️ IA générative (Gemini)
+
+Les faits viennent toujours du pipeline ; Gemini **rédige**, et ce qu'il écrit est **contrôlé**.
+
+**Fiches de risque par commune** ([exemples](docs/fiches_exemples.md)) : un dossier factuel (historique, exposition aux argiles, classement national à 1, 3 et 5 ans, facteurs explicatifs) est transmis à Gemini, qui rédige une fiche structurée. **Chaque nombre écrit doit figurer dans le dossier** ; sinon, un second essai est demandé, puis la fiche est rejetée.
+
+**Assistant question → SQL** ([évaluation](docs/evaluation_assistant.md)) : une question en français devient une requête SQL, toujours affichée. Avant exécution :
+
+- lecture seule, une seule instruction, tables autorisées uniquement, aucune fonction d'accès aux fichiers ;
+- exécution dans une base **isolée** (copie en mémoire, accès aux fichiers coupé, configuration verrouillée), avec durée et nombre de lignes plafonnés ;
+- en cas d'erreur SQL, un second essai avec le message d'erreur ; un refus de sécurité reste définitif.
+
+Évalué sur **12 questions de référence** (requêtes écrites à la main) et **6 tentatives d'attaque** (« supprime la table », « lis /etc/passwd », « ignore tes instructions »…). Les résultats sont dans [`docs/evaluation_assistant.md`](docs/evaluation_assistant.md).
+
+**Limite :** le contrôle garantit qu'aucun nombre inventé n'est publié, mais pas que chaque nombre est attribué au bon facteur. La relecture humaine a d'ailleurs trouvé un cas, documenté dans le [journal d'analyse](docs/journal_analyse.md).
+
+```mermaid
+flowchart LR
+    Q[Question en français] --> G1[Gemini<br/>traduction en SQL]
+    G1 --> V{Garde-fous<br/>lecture seule, tables autorisées}
+    V -- refus --> R[Requête bloquée]
+    V -- ok --> B[(Base isolée<br/>sans accès aux fichiers)]
+    B --> G2[Gemini<br/>résumé]
+    G2 --> C{Chiffres présents<br/>dans le résultat ?}
+    C -- oui --> A[Réponse + SQL affiché]
+    C -- non --> T[Tableau seul]
+```
+
 ## 🧹 Qualité des données
 
 La base GASPAR présente plusieurs défauts signalés publiquement par ses utilisateurs ([discussions data.gouv.fr](https://www.data.gouv.fr/datasets/base-nationale-de-gestion-assistee-des-procedures-administratives-relatives-aux-risques-gaspar/discussions)). Le nettoyage (`src/clean.py`) les traite explicitement, et chaque contrôle est chiffré dans [`reports/qualite_donnees.md`](reports/qualite_donnees.md) :
@@ -144,6 +172,10 @@ python src/explorer.py             # chiffres clés -> reports/exploration.md
 python src/lancer_dbt.py local     # modèles dbt + tests, en local (DuckDB)
 python src/modele.py               # modèle, SHAP, prédictions -> reports/modele.md
 
+# IA générative (clé Gemini, voir docs/guide_gemini.md) :
+python src/fiches.py 32013 06088   # fiches de risque -> reports/fiches.md
+python src/assistant_sql.py "Quelles communes du Gers sont les plus exposées aux argiles ?"
+
 # Avec un accès Google Cloud (docs/guide_gcp.md) :
 python src/load_bigquery.py        # chargement dans BigQuery
 python src/lancer_dbt.py bigquery  # modèles dbt + tests dans BigQuery
@@ -151,7 +183,7 @@ python src/lancer_dbt.py bigquery  # modèles dbt + tests dans BigQuery
 
 ## 🛠️ Stack
 
-Python (pandas, pytest, scikit-learn, LightGBM, GeoPandas) · SQL · Google BigQuery · dbt (BigQuery, DuckDB) · GitHub Actions · Workload Identity Federation · SHAP · Gemini · Streamlit
+Python (pandas, pytest, scikit-learn, LightGBM, GeoPandas) · SQL · Google BigQuery · dbt (BigQuery, DuckDB) · GitHub Actions · Workload Identity Federation · SHAP · Gemini (google-genai, sorties structurées) · sqlglot · Streamlit
 
 ---
 
