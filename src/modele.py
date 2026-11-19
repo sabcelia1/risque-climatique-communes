@@ -70,6 +70,9 @@ def charger() -> pd.DataFrame:
         sys.exit("Base dbt introuvable : lancez d'abord src/lancer_dbt.py local")
     with duckdb.connect(str(chemin), read_only=True) as con:
         df = con.sql("select * from mart_features_risque where historique_complet").df()
+    manquantes = [v for v in VARIABLES if v != "taux_historique" and v not in df.columns]
+    if manquantes:
+        sys.exit(f"Colonnes absentes de la base dbt ({manquantes}) : relancez src/lancer_dbt.py local")
     return preparer(df)
 
 
