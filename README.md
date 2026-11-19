@@ -21,8 +21,8 @@ Ce projet construit, à partir de données publiques :
 ## 🗺️ Feuille de route
 
 - [x] **Étape 1** — Ingestion et qualité : base GASPAR, référentiel des communes, tests unitaires
-- [x] **Étape 2** — Data engineering : modèles dbt dans BigQuery, 26 tests de données dont un test anti-fuite, mise à jour hebdomadaire (GitHub Actions)
-- [x] **Étape 3** — Machine learning : LightGBM par péril, validation temporelle, variables « à date », explicabilité (SHAP)
+- [x] **Étape 2** — Data engineering : modèles dbt dans BigQuery, 30 tests de données dont un test anti-fuite, mise à jour hebdomadaire (GitHub Actions)
+- [x] **Étape 3** — Machine learning : LightGBM par péril à 1, 3 et 5 ans, exposition aux argiles, validation temporelle, variables « à date », explicabilité (SHAP)
 - [ ] **Étape 4** — IA générative : fiches de risque contrôlées, assistant en langage naturel
 - [ ] **Étape 5** — Application Streamlit en ligne, documentation
 
@@ -32,7 +32,8 @@ Ce projet construit, à partir de données publiques :
 |---|---|---|---|
 | [Base GASPAR](https://www.data.gouv.fr/datasets/base-nationale-de-gestion-assistee-des-procedures-administratives-relatives-aux-risques-gaspar) | Ministère de la Transition écologique | Arrêtés de catastrophe naturelle par commune depuis 1982 | Licence Ouverte |
 | [API Découpage administratif](https://geo.api.gouv.fr/decoupage-administratif) | Etalab | Communes, population, superficie, coordonnées | Licence Ouverte |
-| [API Géorisques](https://www.data.gouv.fr/dataservices/api-georisques) *(étape 3)* | Ministère de la Transition écologique, BRGM | Exposition aux inondations et aux argiles | Licence Ouverte |
+| [Zonage d'exposition au retrait-gonflement des argiles](https://files.georisques.fr/argiles/AleaRG_Fxx_L93.zip) | BRGM, via Géorisques | Exposition des sols (2019), croisée avec les communes par `src/exposition_argiles.py` | Licence Ouverte |
+| [Contours des communes](https://geo.api.gouv.fr/decoupage-administratif) | Etalab | Limites communales (2025) | Licence Ouverte |
 
 ## 🔎 Premiers résultats
 
@@ -70,6 +71,7 @@ Le même projet dbt tourne sur **deux bases** : **DuckDB** en local (aucun compt
 | intermediate | `int_evenements` | Événements distincts, communes actuelles, 1982-2024 |
 | intermediate | `int_grille_commune_annee` | Toutes les combinaisons commune × année × péril, **zéros compris** |
 | intermediate | `int_historique_a_date` | Historique de chaque commune **tel qu'il était connu au 1er janvier** (arrêtés déjà signés) |
+| seeds | `exposition_argiles` | Part de chaque commune en exposition faible, moyenne ou forte aux argiles |
 | marts | `dim_commune` | Communes et résumé de leur historique |
 | marts | `fct_evenements` | Un événement reconnu par ligne, prêt pour l'analyse |
 | marts | `mart_features_risque` | **Table d'entraînement du modèle** : historique sur 1, 5 et 10 ans, années depuis le dernier événement, fréquence dans le département, densité… |
@@ -81,21 +83,28 @@ Le même projet dbt tourne sur **deux bases** : **DuckDB** en local (aucun compt
 
 ## 🤖 Modèle de prédiction
 
-Pour chaque commune, un modèle **LightGBM** par péril estime la probabilité d'une reconnaissance CatNat dans l'année, à partir de ce qui était connu au 1er janvier : historique de la commune et du département, taille, localisation.
+Pour chaque commune et chaque péril, des modèles **LightGBM** estiment le risque d'au moins une reconnaissance CatNat **dans 1, 3 ou 5 ans**, à partir de ce qui était connu au 1er janvier : historique de la commune et du département, taille, localisation et **exposition des sols aux argiles** (zonage BRGM).
 
-- **Validation temporelle :** entraînement sur le passé, choix du modèle sur des années de validation, puis **un seul** passage sur des années de test jamais vues (inondation 2021-2024, sécheresse 2017-2021).
-- **Variables « à date » :** au 1er janvier, **aucune** sécheresse de l'année précédente n'est encore reconnue, contre 81 % des inondations. Sans cette règle, le modèle aurait appris avec des informations indisponibles en conditions réelles.
+- **Validation temporelle :** entraînement sur le passé, choix sur des années de validation, puis **un seul** passage sur des années de test jamais vues. Pour les horizons longs, les fenêtres de cible ne se chevauchent jamais entre entraînement, validation et test.
+- **Variables « à date » :** au 1er janvier, **aucune** sécheresse de l'année précédente n'est encore reconnue, contre 81 % des inondations. Les variables ne comptent que les arrêtés déjà signés.
+- **Année exceptionnelle écartée :** en 1999, les tempêtes de décembre ont conduit à reconnaître 78 % des communes en inondation. Les fenêtres qui contiennent cette année inversaient ce que le modèle apprenait ; elles sont exclues de l'entraînement par une règle automatique.
 - **Comparé à deux références :** l'historique de la commune et une régression logistique.
-- **Explicable :** chaque prédiction est décomposée en valeurs SHAP (TreeSHAP exact, identique à la librairie `shap`), et les 3 facteurs principaux sont conservés pour l'IA générative de l'étape 4.
+- **Explicable :** chaque prédiction est décomposée en valeurs SHAP (TreeSHAP exact), et les 3 facteurs principaux sont conservés pour l'IA générative de l'étape 4.
 
-| Péril | AUC test (par année) | Top 10 % des communes jugées les plus à risque |
-|---|---:|---|
-| Inondation | **0,67** (référence : 0,64) | 23 % des communes touchées, **2,3 fois** mieux qu'un ciblage au hasard |
-| Sécheresse | **0,75** (référence : 0,71) | 25 % des communes touchées, **2,5 fois** mieux qu'un ciblage au hasard |
+| Péril | Horizon | AUC test LightGBM | Référence (historique) |
+|---|---|---:|---:|
+| Inondation | 1 an | 0,66 | 0,64 |
+| | 3 ans | 0,68 | 0,66 |
+| | 5 ans | **0,69** | 0,67 |
+| Sécheresse | 1 an | 0,76 | 0,71 |
+| | 3 ans | 0,75 | 0,66 |
+| | 5 ans | **0,81** | 0,70 |
 
-**Ce que le modèle ne sait pas faire, et pourquoi :** une reconnaissance CatNat dépend surtout de la météo de l'année, que personne ne connaît au 1er janvier. Le modèle **classe** les communes à risque, mais ses probabilités brutes ne sont pas fiables en absolu (la sécheresse progresse plus vite que dans les années d'entraînement) : il est donc présenté comme un **classement** (percentile national). Les grandes sécheresses de 2018-2020 ont surtout touché des communes que l'historique ne classait pas parmi les plus exposées. Détail et pistes dans le [journal d'analyse](docs/journal_analyse.md).
+**L'exposition aux argiles est devenue la variable la plus influente pour la sécheresse**, devant la latitude qui servait jusque-là de substitut à la nature du sol. Elle améliore l'AUC de test de 0,02 à 0,03 selon l'horizon.
 
-![AUC par année de test](docs/figures/auc_par_annee.png)
+**Ce que le modèle ne sait pas faire :** une reconnaissance dépend surtout de la météo, inconnue au 1er janvier. Le modèle **classe** bien les communes, mais ses probabilités ne sont pas fiables en valeur absolue, et les recaler sur les années récentes n'a pas suffi (voir le [journal d'analyse](docs/journal_analyse.md)). Le résultat à utiliser est donc le **classement** (percentile national).
+
+![AUC de test par horizon](docs/figures/auc_par_horizon.png)
 
 ![Importance des variables (SHAP)](docs/figures/importance_shap.png)
 
@@ -142,7 +151,7 @@ python src/lancer_dbt.py bigquery  # modèles dbt + tests dans BigQuery
 
 ## 🛠️ Stack
 
-Python (pandas, pytest, scikit-learn, LightGBM) · SQL · Google BigQuery · dbt (BigQuery, DuckDB) · GitHub Actions · Workload Identity Federation · scikit-learn · SHAP · Gemini · Streamlit
+Python (pandas, pytest, scikit-learn, LightGBM, GeoPandas) · SQL · Google BigQuery · dbt (BigQuery, DuckDB) · GitHub Actions · Workload Identity Federation · SHAP · Gemini · Streamlit
 
 ---
 

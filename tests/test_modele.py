@@ -95,3 +95,16 @@ def test_exposition_ajoutee_si_disponible():
     df = table_factice().assign(part_argile_fort=0.2)
     assert "part_argile_fort" in modele.variables(df)
     assert "part_argile_fort" not in modele.variables(table_factice())
+
+
+def test_annee_exceptionnelle_exclue_de_l_entrainement():
+    df = table_factice()
+    masque = (df["famille_peril"] == "inondation") & (df["annee"] == 1999)
+    df.loc[masque, "cible"] = 1                                  # 100 % des communes reconnues
+    for h, col in ((3, "cible_3ans"), (5, "cible_5ans")):
+        df.loc[(df["famille_peril"] == "inondation") & df["annee"].between(1999 - h + 1, 1999), col] = 1
+    assert modele.annees_exceptionnelles(df, "inondation") == [1999]
+    assert modele.annees_exceptionnelles(df, "secheresse") == []
+    for h in (1, 3, 5):
+        train = modele.decouper(df, "inondation", h)["entrainement"]
+        assert not train["annee"].between(1999 - h + 1, 1999).any()   # aucune fenêtre ne contient 1999

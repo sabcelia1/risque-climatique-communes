@@ -241,3 +241,83 @@ La colonne `annee_evaluable` signale les autres lignes, que l'étape 3 n'utilise
 - **Exposition physique :** ajouter la carte d'exposition au retrait-gonflement des argiles (BRGM) et les zones inondables, plutôt que la latitude et la longitude. Ce sont des polygones à croiser avec les contours des communes, d'où un traitement géographique plus lourd.
 - **Recalibrer** les probabilités sur les années récentes, pour les rendre utilisables en tarification.
 - **Horizon pluriannuel :** prédire « au moins une reconnaissance dans les 5 ans » serait moins dépendant de la météo d'une année, et plus proche des besoins d'un assureur.
+
+---
+
+## Étape 3 bis — Améliorer le modèle
+
+Trois pistes, testées dans cet ordre : l'exposition physique des sols, la calibration des probabilités, puis des horizons de prédiction à 3 et 5 ans.
+
+### 1. Exposition aux argiles ✅
+
+- **Hypothèse :** pour la sécheresse, la latitude et la longitude servaient de substitut à la nature du sol. La vraie information devrait faire mieux.
+- **Source :** le zonage d'exposition au retrait-gonflement des argiles du BRGM (2019, 122 222 zones, 3 niveaux). Le service statistique du ministère publie des agrégats, mais par intercommunalité seulement, ce qui est trop grossier.
+- **Méthode :** 200 points tirés au hasard dans chaque commune (contours Etalab 2025), puis croisés avec les zones. La part des points donne la part du territoire par niveau d'exposition. Le calcul (7 millions de points, 13 minutes) tourne une seule fois sur GitHub Actions ; le résultat (34 881 communes) est versionné comme table de référence dbt (`seeds/exposition_argiles.csv`).
+- **Contrôle de vraisemblance :** le Gers (91 % de surface en exposition forte), le Lot-et-Garonne et la Haute-Garonne sont en tête, comme attendu dans le Sud-Ouest argileux. La Bretagne et la Corse sont peu exposées. Paris n'est pas couvert par la carte.
+- **Résultat :** la part en exposition forte devient **la variable la plus influente** du modèle sécheresse, devant la latitude.
+
+| Sécheresse | AUC validation sans → avec | AUC test sans → avec |
+|---|---:|---:|
+| 1 an | 0,906 → 0,916 | 0,738 → 0,759 |
+| 3 ans | 0,902 → 0,918 | 0,722 → 0,751 |
+| 5 ans | 0,910 → 0,920 | 0,778 → 0,808 |
+
+- Pour l'inondation, l'effet est nul, ce qui est logique : ce n'est pas le bon phénomène physique. Les variables sont gardées pour la simplicité (un seul jeu de variables), sans dégrader les résultats.
+- **Limite :** le zonage date de 2019 et s'appuie en partie sur des sinistres passés. Pour les années de test 2017-2018, une petite part d'information postérieure est possible. La géologie, elle, ne change pas.
+- **Non fait pour l'inondation :** il n'existe pas de carte nationale unique des zones inondables en open data (les enveloppes EAIP sont publiées région par région). Les plans de prévention et atlas datés de GASPAR avaient déjà été testés sans gain.
+
+### 2. Horizons de 3 et 5 ans
+
+- **Cible :** au moins une reconnaissance entre l'année t et l'année t + h - 1.
+- **Découpage :** une fenêtre de 5 ans démarrant en 2018 couvre 2018-2022. Pour qu'aucune année de cible ne soit partagée, l'entraînement s'arrête 5 ans avant le début de la validation, et la validation 5 ans avant le test (test unitaire dédié). Seules les fenêtres entièrement évaluables sont utilisées (sécheresse : jusqu'en 2021).
+
+#### ❌ Une anomalie : l'inondation à 5 ans sous le hasard
+
+- **Observation :** au premier essai, l'AUC de validation de l'inondation à 5 ans valait **0,47**, pire que le hasard, alors que l'historique seul faisait 0,61.
+- **Diagnostic :** par année de départ, l'historique est un bon prédicteur (AUC 0,6 à 0,7)… sauf pour les fenêtres qui contiennent **1999**, où il s'inverse (AUC 0,37 à 0,43).
+- **Cause :** en 1999, **77,9 %** des communes ont été reconnues en inondation, contre 1 à 16 % les autres années (tempêtes de décembre). Les communes jamais touchées l'ont été aussi. Les fenêtres de 1995 à 1999 contiennent toutes cette année, avec plus de 80 % de communes « touchées », et elles pèsent lourd dans l'entraînement à 5 ans (1992-2007). Le modèle y apprenait « moins une commune a d'historique, plus elle est à risque ».
+- **Vérification (validation) :** en entraînant à partir des fenêtres de 2000, l'AUC de validation passe de 0,46 à 0,63. Avec la règle finale ci-dessous, qui ne retire que les fenêtres contenant 1999, elle vaut 0,625.
+- 📌 **Décision :** une règle explicite plutôt qu'un cas codé à la main. Une année où plus de 50 % des communes sont reconnues est « exceptionnelle », et les fenêtres d'entraînement qui la contiennent sont écartées. Seule 1999 (inondation) est concernée. La règle améliore aussi l'horizon d'un an (validation 0,746 → 0,790).
+
+#### Résultats
+
+| Péril | Horizon | Communes touchées (test) | AUC validation | AUC test | Historique (test) | Régression logistique (test) |
+|---|---|---:|---:|---:|---:|---:|
+| Inondation | 1 an | 5,2 % | 0,790 | 0,657 | 0,644 | 0,659 |
+| | 3 ans | 12,2 % | 0,642 | 0,676 | 0,658 | 0,661 |
+| | 5 ans | 19,3 % | 0,625 | **0,694** | 0,666 | 0,640 |
+| Sécheresse | 1 an | 6,8 % | 0,916 | 0,759 | 0,710 | 0,753 |
+| | 3 ans | 18,1 % | 0,918 | 0,751 | 0,663 | 0,715 |
+| | 5 ans | 23,7 % | 0,920 | **0,808** | 0,697 | 0,776 |
+
+- **Plus l'horizon est long, mieux le modèle classe** : le hasard météo d'une année se lisse sur plusieurs années.
+- LightGBM bat l'historique à tous les horizons, et la régression logistique à 3 et 5 ans. À 1 an pour l'inondation, les trois approches se valent.
+
+### 3. Calibration des probabilités ❌ (résultat négatif, conservé)
+
+- **Méthode :** recalage de Platt (deux paramètres sur le score du modèle) appris sur les années de validation, puis mesuré en test. Le classement des communes ne change pas.
+- **Résultat :**
+
+| Péril | Horizon | Prédit avant → après recalage | Observé | Score de Brier avant → après |
+|---|---|---:|---:|---:|
+| Inondation | 1 an | 5,7 % → 2,9 % | 5,2 % | 0,0492 → 0,0499 |
+| | 3 ans | 14,4 % → 14,8 % | 12,2 % | 0,1034 → 0,1035 |
+| | 5 ans | 24,7 % → 20,8 % | 19,3 % | 0,1485 → 0,1452 |
+| Sécheresse | 1 an | 1,6 % → 2,2 % | 6,8 % | 0,0650 → 0,0652 |
+| | 3 ans | 5,5 % → 2,2 % | 18,1 % | 0,1595 → 0,1697 |
+| | 5 ans | 8,9 % → 8,3 % | 23,7 % | 0,1790 → 0,1829 |
+
+- **Le recalage n'aide qu'à 5 ans pour l'inondation.** Ailleurs, il est neutre ou dégrade la calibration.
+- **Pourquoi :**
+  - le taux de communes reconnues varie d'un facteur 10 d'une année à l'autre selon la météo (sécheresse : 0,7 % en 2021, 11,6 % en 2018). Recaler sur deux années revient à recaler sur deux tirages : l'inondation 2019-2020 (2,6 % et 3,4 %) a tiré les probabilités vers le bas, juste avant des années plus fortes ;
+  - la sécheresse suit en plus une **tendance de fond** (H1) : les années de recalage sont toujours en retard sur le niveau actuel.
+- 📌 **Décision :** le recalage reste dans le pipeline de production, appris sur les fenêtres les plus récentes, mais les probabilités sont présentées comme **indicatives**. Le résultat fiable, c'est le **classement** (`percentile_national`). Changer de méthode maintenant, après avoir vu le test, reviendrait à l'utiliser pour choisir.
+- **Piste :** recaler sur une période plus longue (5 à 10 ans) pour lisser la météo, et modéliser explicitement la tendance de la sécheresse.
+
+### Bilan
+
+| | Avant | Après |
+|---|---|---|
+| Sécheresse, meilleur horizon | 0,75 (1 an) | **0,81 (5 ans)** |
+| Inondation, meilleur horizon | 0,67 (1 an) | **0,69 (5 ans)** |
+| Variable n° 1, sécheresse | latitude | **exposition forte aux argiles** |
