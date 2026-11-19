@@ -36,15 +36,21 @@ jobs:
           python src/lancer_dbt.py local > /dev/null
           python src/modele.py > /dev/null
 
+      - name: Test de connexion à Gemini
+        timeout-minutes: 5
+        run: python -u src/llm.py
+
       - name: Fiches de risque d'exemple
-        run: python src/fiches.py --exemples
+        timeout-minutes: 20
+        run: python -u src/fiches.py --exemples
 
       - name: Évaluation de l'assistant SQL
-        run: python src/evaluer_assistant.py
+        timeout-minutes: 20
+        run: python -u src/evaluer_assistant.py
 
       - name: Publier les résultats
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/fiches_exemples.md docs/fiches_exemples.json docs/evaluation_assistant.md
+          git add -f docs/fiches_exemples.md docs/fiches_exemples.json docs/evaluation_assistant.md
           git commit -m "IA générative : fiches d'exemple et évaluation de l'assistant" && git push || echo "Aucun changement"

@@ -17,6 +17,7 @@ from config import ROOT_DIR
 MODELES_PAR_DEFAUT = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 FICHIER_CLE = ROOT_DIR / "secrets" / "gemini.env"
 PAUSE_ENTRE_APPELS_S = 4          # respecte les quotas du niveau gratuit
+DELAI_APPEL_MS = 90_000            # un appel bloqué est abandonné au bout de 90 s
 
 
 class LLMIndisponible(Exception):
@@ -38,11 +39,12 @@ class Gemini:
 
     def __init__(self, modele: str | None = None):
         from google import genai
+        from google.genai import types
 
         cle = cle_api()
         if not cle:
             raise LLMIndisponible("clé Gemini introuvable : voir docs/guide_gemini.md")
-        self.client = genai.Client(api_key=cle)
+        self.client = genai.Client(api_key=cle, http_options=types.HttpOptions(timeout=DELAI_APPEL_MS))
         self.candidats = [modele or os.environ.get("GEMINI_MODEL")] if (modele or os.environ.get("GEMINI_MODEL")) \
             else list(MODELES_PAR_DEFAUT)
         self.modele = None
@@ -58,24 +60,30 @@ class Gemini:
             if attente > 0:
                 time.sleep(attente)
             modele = self.modele or self.candidats[0]
+            debut = time.time()
             try:
                 self._dernier_appel = time.time()
                 reponse = self.client.models.generate_content(model=modele, contents=contenu, config=config)
                 self.modele = modele
                 return json.loads(reponse.text)
             except errors.ClientError as e:
+                print(f"  [gemini] {modele} : erreur {e.code} après {time.time() - debut:.0f} s", flush=True)
                 if e.code == 404 and not self.modele and len(self.candidats) > 1:
-                    print(f"  modèle {modele} indisponible, essai du suivant")
                     self.candidats.pop(0)
                     continue
                 if e.code == 429:                                  # quota : on patiente
                     time.sleep(20 * (essai + 1))
                     continue
-                raise LLMIndisponible(f"erreur Gemini {e.code} : {str(e)[:200]}") from e
-            except errors.ServerError:
+                raise LLMIndisponible(f"erreur Gemini {e.code} : {str(e)[:300]}") from e
+            except errors.ServerError as e:
+                print(f"  [gemini] {modele} : erreur serveur {e.code}", flush=True)
                 time.sleep(10 * (essai + 1))
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, TypeError):
+                print(f"  [gemini] {modele} : réponse non JSON", flush=True)
                 continue
+            except Exception as e:                                # délai dépassé, réseau
+                print(f"  [gemini] {modele} : {type(e).__name__} après {time.time() - debut:.0f} s", flush=True)
+                time.sleep(5)
         raise LLMIndisponible("Gemini n'a pas répondu après plusieurs tentatives")
 
 
@@ -91,3 +99,20 @@ class FauxLLM:
     def json(self, consigne, contenu, schema, temperature=0.2):
         self.appels.append(contenu)
         return self.reponses.pop(0)
+
+
+if __name__ == "__main__":
+    # Test de connexion : modèles accessibles avec la clé, puis un appel minimal
+    from pydantic import BaseModel
+
+    class Ping(BaseModel):
+        reponse: str
+
+    llm = Gemini()
+    noms = [m.name.removeprefix("models/") for m in llm.client.models.list()]
+    flash = sorted(n for n in noms if "flash" in n)
+    print(f"{len(noms)} modèles accessibles, dont Flash : {', '.join(flash[:15])}")
+    if not os.environ.get("GEMINI_MODEL"):
+        llm.candidats = [m for m in MODELES_PAR_DEFAUT if m in noms] or flash[:1]
+    t = time.time()
+    print("Réponse :", llm.json("Réponds en JSON.", "Dis bonjour en un mot.", Ping), f"({llm.modele}, {time.time() - t:.1f} s)")

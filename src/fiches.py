@@ -198,10 +198,15 @@ def main() -> int:
         return 1
     resultats = []
     for code in codes:
-        r = rediger(llm, dossier(con, code))
+        try:
+            r = rediger(llm, dossier(con, code))
+        except LLMIndisponible as e:
+            print(f"{code} : Gemini indisponible ({e})", flush=True)
+            continue
         resultats.append(r)
         print(f"{code} {r['faits']['commune']} : {'valide' if r['valide'] else 'REJETÉE'} "
-              f"({r['essais']} essai(s)){' ' + str(r['nombres_hors_dossier']) if r['nombres_hors_dossier'] else ''}")
+              f"({r['essais']} essai(s)){' ' + str(r['nombres_hors_dossier']) if r['nombres_hors_dossier'] else ''}",
+              flush=True)
     valides = sum(r["valide"] for r in resultats)
     entete = ["# Fiches de risque : exemples générés par Gemini", "",
               f"_Générées par `src/fiches.py` le {pd.Timestamp.today():%d/%m/%Y} avec {llm.modele}. "
