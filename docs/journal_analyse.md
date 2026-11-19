@@ -321,3 +321,42 @@ Trois pistes, testées dans cet ordre : l'exposition physique des sols, la calib
 | Sécheresse, meilleur horizon | 0,75 (1 an) | **0,81 (5 ans)** |
 | Inondation, meilleur horizon | 0,67 (1 an) | **0,69 (5 ans)** |
 | Variable n° 1, sécheresse | latitude | **exposition forte aux argiles** |
+
+---
+
+## Étape 4 — IA générative
+
+### 📌 Principe : le modèle de langage rédige, il ne décide pas des faits
+
+Les deux usages de Gemini reposent sur la même règle. Les **faits** viennent toujours du pipeline (dbt, modèle). Gemini se contente de les **mettre en forme**, et un contrôle automatique vérifie ce qu'il écrit.
+
+- **Fiches de risque :** pour chaque commune, un dossier factuel est construit (historique, exposition aux argiles, classement national à 1, 3 et 5 ans, facteurs explicatifs), avec des valeurs déjà formatées en français. Gemini rédige une fiche structurée (sortie JSON) à partir de ce seul dossier. Chaque nombre de la fiche doit figurer dans le dossier : sinon, un second essai est demandé en citant les nombres en cause, puis la fiche est rejetée.
+- **Assistant question → SQL :**
+  - Gemini traduit une question en SQL.
+  - La requête n'est exécutée qu'après des garde-fous : lecture seule, une seule instruction, tables autorisées seulement, aucune fonction d'accès aux fichiers, lignes et durée plafonnées.
+  - L'exécution a lieu dans une base **isolée** : copie en mémoire de trois tables, accès aux fichiers coupé, configuration verrouillée. Même une requête qui passerait les garde-fous ne pourrait rien lire d'autre (vérifié par des tests).
+  - Le SQL est toujours affiché, et le résumé en français n'est montré que si ses nombres figurent dans le résultat.
+
+### Choix du modèle et quotas
+
+- Niveau **gratuit** de l'API Gemini (modèles Flash). Au niveau gratuit, Google peut utiliser les requêtes pour améliorer ses produits : le projet n'envoie que des données publiques.
+- **Observation :** les modèles gratuits renvoient souvent « 503 : high demand ». Le même appel réussit à la tentative suivante, en moins d'une seconde. Le client alterne donc entre plusieurs modèles Flash, avec une attente croissante entre les tentatives, et note dans chaque fiche le modèle qui l'a rédigée. Une génération complète prend environ 15 à 30 minutes. Elle est lancée à la demande (workflow « IA générative »), pas chaque semaine.
+
+### Première exécution
+
+| | Résultat |
+|---|---|
+| Fiches d'exemple (8 communes) | **8/8** validées par le contrôle des chiffres, toutes au premier essai |
+| Assistant, questions de référence | **11/12** justes |
+| Assistant, tentatives d'attaque | **6/6** refusées par le modèle lui-même (les garde-fous n'ont pas eu à intervenir) |
+
+### ❌ Ce que le contrôle automatique n'a pas vu
+
+La relecture des fiches contre leurs dossiers a révélé deux problèmes :
+
+1. **Paris, une erreur de données (du pipeline, pas de Gemini).** Le zonage du BRGM ne couvre pas Paris. Le calcul d'exposition y comptait donc 0 % d'argile, et la fiche annonçait « une exposition nulle ». Or « non cartographié » n'est pas « non exposé ».
+   - 📌 Paris est désormais sans valeur (vide) dans la table d'exposition. Le dossier indique « non couverte par le zonage BRGM », et un test le vérifie.
+2. **Le contrôle vérifie les chiffres, pas le sens.** Dans la fiche de Lille, la population est présentée comme un facteur du risque sécheresse, alors qu'elle ne fait pas partie des facteurs sécheresse de la commune (c'est un facteur inondation). Le nombre existe bien dans le dossier : le contrôle passe.
+   - **Limite assumée.** Un contrôle du sens demanderait un second relecteur, automatique ou humain. Le contrôle des chiffres garantit seulement qu'**aucun nombre inventé** n'est publié.
+
+L'unique erreur de l'assistant venait de la table des prédictions, qui ne contenait pas le nom des communes : Gemini l'y a cherché. 📌 Le nom de la commune et du département y est ajouté, et l'assistant dispose maintenant d'**un second essai** quand sa requête échoue, avec le message d'erreur. Un refus des garde-fous, lui, reste définitif.
