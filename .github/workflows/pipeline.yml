@@ -51,7 +51,10 @@ jobs:
         run: python src/lancer_dbt.py local
 
       - name: Modèle de prédiction (LightGBM, SHAP)
-        run: python src/modele.py
+        run: |
+          python src/modele.py
+          cat reports/modele.md >> "$GITHUB_STEP_SUMMARY"
+          cat reports/metriques_modele.json
 
       - name: Connexion à Google Cloud (fédération d'identité, sans clé)
         if: env.GCP_WIF_PROVIDER != ''

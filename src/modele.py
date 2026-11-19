@@ -229,10 +229,12 @@ def figures(resultats: dict, importances: dict, calibrations: dict) -> None:
     plt.close(fig)
 
 
-def rapport(resultats: dict, importances: dict, infos: dict) -> str:
+def rapport(resultats: dict, validations: dict, importances: dict, infos: dict) -> str:
     md = ["# Modèle de prédiction des reconnaissances CatNat", "",
           f"_Généré par `src/modele.py` le {pd.Timestamp.today():%d/%m/%Y}._", "",
           "Un modèle par famille de péril, évalué sur des années **jamais vues** à l'entraînement. "
+          "Scores moyens par année (le niveau de risque global d'une année dépend de sa météo, "
+          "que le modèle ne connaît pas : il s'agit de **classer** les communes au sein d'une année). "
           "L'AUC mesure la capacité à classer les communes (0,5 = hasard, 1 = parfait) ; "
           "« Top 10 % » est la part des communes réellement touchées que l'on trouve parmi "
           "les 10 % de communes jugées les plus à risque.", ""]
@@ -242,11 +244,14 @@ def rapport(resultats: dict, importances: dict, infos: dict) -> str:
                f"- Entraînement {i['entrainement']}, validation {i['validation']}, test {i['test']}.",
                f"- {i['n_train']:,} lignes d'entraînement, {i['n_test']:,} lignes de test ; "
                f"{i['arbres']} arbres retenus (arrêt anticipé sur la validation).", "",
-               "| Modèle | AUC moyen par année | Top 10 % | Précision moyenne | Brier |",
-               "|---|---:|---:|---:|---:|"]
+               "| Modèle | AUC validation | AUC test | Top 10 % validation | Top 10 % test | Brier test |",
+               "|---|---:|---:|---:|---:|---:|"]
         for nom, r in res.items():
-            md.append(f"| {nom} | {r['auc_moyen_par_annee']:.3f} | {r['top10_moyen_par_annee']:.1%} | "
-                      f"{r['precision_moyenne']:.3f} | {r['brier']:.4f} |")
+            v = validations[famille][nom]
+            md.append(f"| {nom} | {v['auc_moyen_par_annee']:.3f} | {r['auc_moyen_par_annee']:.3f} | "
+                      f"{v['top10_moyen_par_annee']:.1%} | {r['top10_moyen_par_annee']:.1%} | {r['brier']:.4f} |")
+        md += ["", "_Le choix du modèle se fait sur la validation ; le test, jamais utilisé pour "
+               "décider, mesure la performance attendue sur des années nouvelles._"]
         lgbm = res["LightGBM"]["par_annee"]
         md += ["", "| Année de test | Communes touchées | AUC | Top 10 % |", "|---|---:|---:|---:|"]
         md += [f"| {a} | {v['taux_reel']:.1%} | {v['auc']:.3f} | {v['top10']:.1%} |" for a, v in lgbm.items()]
@@ -264,7 +269,7 @@ def main() -> int:
     from sklearn.calibration import calibration_curve
 
     df = charger()
-    resultats, importances, calibrations, infos, predictions = {}, {}, {}, {}, []
+    resultats, validations, importances, calibrations, infos, predictions = {}, {}, {}, {}, {}, []
     MODELS_DIR.mkdir(exist_ok=True)
 
     for famille in DECOUPAGE:
@@ -273,18 +278,32 @@ def main() -> int:
         train, val, test = parts["entrainement"], parts["validation"], parts["test"]
         y, annees = test["cible"].to_numpy(), test["annee"].to_numpy()
 
+        # 1. Validation (SEUL critère de choix) : modèles entraînés sur l'entraînement seul
         lgbm = entrainer_lgbm(train, val)
-        logit = regression_logistique(pd.concat([train, val]))
+        logit_val = regression_logistique(train)
+        scores_val = {
+            "LightGBM": lgbm.predict(val[list(VARIABLES)], num_iteration=lgbm.best_iteration),
+            "Régression logistique": logit_val.predict_proba(val[list(VARIABLES)])[:, 1],
+            "Historique de la commune": reference_historique(val),
+        }
+        validations[famille] = {nom: evaluer(val["cible"], s, val["annee"]) for nom, s in scores_val.items()}
+
+        # 2. Test : modèles réentraînés sur entraînement + validation, évalués une seule fois
+        anterieur = pd.concat([train, val])
+        lgbm_test = entrainer_lgbm(anterieur, n_arbres=max(lgbm.best_iteration, 50))
+        logit = regression_logistique(anterieur)
         scores = {
-            "LightGBM": lgbm.predict(test[list(VARIABLES)], num_iteration=lgbm.best_iteration),
+            "LightGBM": lgbm_test.predict(test[list(VARIABLES)]),
             "Régression logistique": logit.predict_proba(test[list(VARIABLES)])[:, 1],
             "Historique de la commune": reference_historique(test),
         }
         resultats[famille] = {nom: evaluer(y, s, annees) for nom, s in scores.items()}
         for nom, r in resultats[famille].items():
-            print(f"  {nom:<26} AUC/an {r['auc_moyen_par_annee']:.3f}  top10 {r['top10_moyen_par_annee']:.1%}")
+            v = validations[famille][nom]
+            print(f"  {nom:<26} validation AUC/an {v['auc_moyen_par_annee']:.3f} top10 {v['top10_moyen_par_annee']:.1%}"
+                  f" | test AUC/an {r['auc_moyen_par_annee']:.3f} top10 {r['top10_moyen_par_annee']:.1%}")
 
-        shap = contributions_shap(lgbm, test)
+        shap = contributions_shap(lgbm_test, test)
         importances[famille] = shap[list(VARIABLES)].abs().mean()
         calibrations[famille] = calibration_curve(y, scores["LightGBM"], n_bins=10, strategy="quantile")[::-1]
         infos[famille] = {**{k: f"{a}-{b}" for k, (a, b) in DECOUPAGE[famille].items()},
@@ -307,10 +326,12 @@ def main() -> int:
     figures(resultats, importances, calibrations)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     (REPORTS_DIR / "metriques_modele.json").write_text(json.dumps(
-        {"resultats": resultats, "infos": infos,
-         "importances": {f: imp.round(4).to_dict() for f, imp in importances.items()}},
+        {"resultats": resultats, "validations": validations, "infos": infos,
+         "importances": {f: imp.round(4).to_dict() for f, imp in importances.items()},
+         "calibrations": {f: {"predit": list(map(float, p)), "observe": list(map(float, o))}
+                          for f, (p, o) in calibrations.items()}},
         indent=2, ensure_ascii=False), encoding="utf-8")
-    (REPORTS_DIR / "modele.md").write_text(rapport(resultats, importances, infos), encoding="utf-8")
+    (REPORTS_DIR / "modele.md").write_text(rapport(resultats, validations, importances, infos), encoding="utf-8")
     print("\nTerminé : reports/modele.md, reports/figures/, data/processed/predictions.parquet")
     return 0
 
