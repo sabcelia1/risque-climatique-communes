@@ -68,6 +68,11 @@ DECOUPAGE_1AN = {
     "secheresse": {"entrainement": (DEBUT_ENTRAINEMENT, 2014), "validation": (2015, 2016), "test": (2017, 2021)},
 }
 ANNEES_TEST, ANNEES_VALIDATION = 3, 2     # horizons 3 et 5 ans
+# Une année où plus de la moitié des communes sont reconnues est « exceptionnelle » : en
+# 1999, les tempêtes de décembre ont entraîné une reconnaissance inondation pour 78 % des
+# communes, y compris celles jamais touchées. Les fenêtres qui la contiennent apprendraient
+# au modèle une relation inversée ; elles sont exclues de l'entraînement.
+SEUIL_ANNEE_EXCEPTIONNELLE = 0.5
 
 PARAMETRES = {
     "objective": "binary", "learning_rate": 0.05, "num_leaves": 31, "min_child_samples": 200,
@@ -136,12 +141,27 @@ def periodes_production(famille: str, horizon: int) -> dict[str, tuple[int, int]
     return {"entrainement": (DEBUT_ENTRAINEMENT, debut_cal - horizon), "validation": (debut_cal, fin_cal)}
 
 
+def annees_exceptionnelles(df: pd.DataFrame, famille: str) -> list[int]:
+    """Années où la part de communes reconnues dépasse SEUIL_ANNEE_EXCEPTIONNELLE."""
+    sous = df[(df["famille_peril"] == famille) & df["annee_evaluable"]]
+    taux = sous.groupby("annee")["cible"].mean()
+    return [int(a) for a in taux[taux > SEUIL_ANNEE_EXCEPTIONNELLE].index]
+
+
 def decouper(df: pd.DataFrame, famille: str, horizon: int = 1, production: bool = False) -> dict[str, pd.DataFrame]:
-    """Sépare les lignes par années de début de fenêtre ; colonne « y » = cible de l'horizon."""
+    """Sépare les lignes par années de début de fenêtre ; colonne « y » = cible de l'horizon.
+    L'entraînement exclut les fenêtres qui contiennent une année exceptionnelle."""
     cible, evaluable = colonnes_horizon()[horizon]
     sous = df[(df["famille_peril"] == famille) & df[evaluable]].assign(y=lambda d: d[cible])
     bornes = periodes_production(famille, horizon) if production else periodes(famille, horizon)
     parts = {nom: sous[sous["annee"].between(a, b)] for nom, (a, b) in bornes.items()}
+    exclues = annees_exceptionnelles(df, famille)
+    if exclues:
+        train = parts["entrainement"]
+        touche = np.zeros(len(train), dtype=bool)
+        for a in exclues:
+            touche |= train["annee"].between(a - horizon + 1, a).to_numpy()
+        parts["entrainement"] = train[~touche]
     noms = list(bornes)
     for avant, apres in zip(noms, noms[1:]):
         fin_fenetre = bornes[avant][1] + horizon - 1
@@ -283,6 +303,7 @@ def evaluer_famille_horizon(df: pd.DataFrame, famille: str, h: int, noms: list[s
         courbes[nom] = {"predit": pred.tolist(), "observe": obs.tolist()}
     return {
         "periodes": {k: f"{a}-{b}" for k, (a, b) in periodes(famille, h).items()},
+        "annees_exceptionnelles": annees_exceptionnelles(df, famille),
         "n_train": len(train), "n_test": len(test), "arbres": lgbm.best_iteration,
         "calibrateur": {"a": calib.a, "b": calib.b},
         "resultats": resultats,
@@ -383,7 +404,9 @@ def rapport(metriques: dict, libelles: dict) -> str:
             per = m["periodes"]
             md += [f"### Horizon {h} an{'s' if int(h) > 1 else ''}", "",
                    f"Entraînement {per['entrainement']}, validation {per['validation']}, test {per['test']} "
-                   f"(années de départ) ; {m['n_train']:,} lignes d'entraînement, {m['arbres']} arbres. "
+                   f"(années de départ) ; {m['n_train']:,} lignes d'entraînement, {m['arbres']} arbres"
+                   + (f", fenêtres contenant {', '.join(map(str, m['annees_exceptionnelles']))} exclues"
+                      if m.get('annees_exceptionnelles') else "") + ". "
                    f"Communes touchées en test : {r['LightGBM']['taux_reel']:.1%}.", "",
                    "| Modèle | AUC validation | AUC test | Top 10 % test |", "|---|---:|---:|---:|"]
             md += [f"| {nom} | {v[nom]['auc_moyen_par_annee']:.3f} | {r[nom]['auc_moyen_par_annee']:.3f} | "
