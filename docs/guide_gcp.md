@@ -30,7 +30,7 @@ Le script peut être relancé sans risque : ce qui existe déjà est conservé.
 
 ## 2. Renseigner le fournisseur dans le workflow
 
-Dans `.github/workflows/pipeline.yml`, remplacez la ligne `GCP_WIF_PROVIDER: ""` par la valeur affichée à la fin du script (entre guillemets), puis publiez la modification. Cette valeur n'est pas secrète.
+Dans `.github/workflows/pipeline.yml`, la ligne `GCP_WIF_PROVIDER` reçoit la valeur affichée à la fin du script (déjà fait pour ce dépôt). Cette valeur n’est pas secrète.
 
 ## 3. Lancer et vérifier
 
