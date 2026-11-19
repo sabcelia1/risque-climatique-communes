@@ -2,13 +2,21 @@ name: Essais de modélisation
 on:
   push:
     branches: [experiences]
+permissions:
+  contents: write
 jobs:
   essais:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
-      - run: pip install requests pandas
-      - run: python experiences/chercher_sources.py
+      - run: pip install requests pandas geopandas pyogrio
+      - run: /usr/bin/time -v python src/exposition_argiles.py 2>&1 | grep -v "^\s*\(Page\|Socket\|Signals\|Swaps\|File system\|Average\|Voluntary\|Involuntary\|Exit\|Minor\|Major\|Percent\|System time\|User time\)"
+      - name: Enregistrer le résultat
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/reference/exposition_argiles.csv
+          git commit -m "Exposition des communes aux argiles (calcul automatique)" && git push || echo "rien à publier"
