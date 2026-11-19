@@ -32,9 +32,10 @@ echo.
 echo === Etape 4 : modeles dbt et tests, en local (DuckDB)
 ".venv\Scripts\python.exe" src\lancer_dbt.py local || goto :erreur
 
-if not exist "secrets\cle-gcp.json" (
+".venv\Scripts\python.exe" src\gcp.py
+if errorlevel 1 (
     echo.
-    echo === BigQuery ignore : pas de cle dans secrets\cle-gcp.json ^(voir docs\guide_gcp.md^)
+    echo === BigQuery ignore en local : il tourne sur GitHub Actions ^(voir docs\guide_gcp.md^)
     goto :fin
 )
 

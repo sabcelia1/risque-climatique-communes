@@ -57,6 +57,8 @@ flowchart LR
     J[GitHub Actions<br/>chaque lundi] -.-> C
 ```
 
+L'accès à BigQuery depuis GitHub Actions se fait **sans clé**, par fédération d'identité (Workload Identity Federation) : un jeton temporaire, valable uniquement pour ce dépôt.
+
 Le même projet dbt tourne sur **deux bases** : **DuckDB** en local (aucun compte cloud nécessaire, idéal pour tester) et **BigQuery** en production. Le SQL est écrit pour être portable (macros `dbt.datediff`, `dbt.type_int`, macro `serie_annees` adaptée à chaque base).
 
 ### Modèles dbt
@@ -110,14 +112,14 @@ python src/clean.py                # nettoyage + rapport qualité
 python src/explorer.py             # chiffres clés -> reports/exploration.md
 python src/lancer_dbt.py local     # modèles dbt + tests, en local (DuckDB)
 
-# Avec une clé Google Cloud (docs/guide_gcp.md) :
+# Avec un accès Google Cloud (docs/guide_gcp.md) :
 python src/load_bigquery.py        # chargement dans BigQuery
 python src/lancer_dbt.py bigquery  # modèles dbt + tests dans BigQuery
 ```
 
 ## 🛠️ Stack
 
-Python (pandas, pytest) · SQL · Google BigQuery · dbt (BigQuery, DuckDB) · GitHub Actions · scikit-learn · SHAP · Gemini · Streamlit
+Python (pandas, pytest) · SQL · Google BigQuery · dbt (BigQuery, DuckDB) · GitHub Actions · Workload Identity Federation · scikit-learn · SHAP · Gemini · Streamlit
 
 ---
 

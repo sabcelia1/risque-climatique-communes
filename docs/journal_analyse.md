@@ -137,7 +137,7 @@ Répartition des événements reconnus par famille de péril (%) :
 - **dbt** pour toutes les transformations SQL : chaque table est versionnée, documentée et testée, et ses dépendances sont explicites.
 - **Deux cibles pour le même code :** DuckDB en local (aucun compte cloud, tests rapides) et BigQuery en production. Le SQL évite les fonctions propres à une seule base, et les rares différences passent par une macro (`serie_annees`).
 - **Rechargement complet à chaque exécution** plutôt qu'incrémental : la base GASPAR est republiée en entier (et corrigée rétroactivement), elle reste petite (≈ 250 000 lignes), et le bac à sable BigQuery n'autorise pas les mises à jour ligne à ligne (`MERGE`).
-- **Aucun identifiant dans le code :** la clé Google Cloud est lue dans `secrets/` (exclu de Git) ou dans un secret GitHub.
+- **Aucune clé, nulle part :** la création de clés de compte de service est bloquée par la règle de sécurité par défaut de l'organisation Google Cloud (`iam.disableServiceAccountKeyCreation`). Plutôt que de lever cette protection, le pipeline s'authentifie par **fédération d'identité** (Workload Identity Federation) : GitHub présente un jeton temporaire signé, accepté uniquement pour ce dépôt, et le compte de service n'a que deux droits BigQuery. Il n'y a aucun secret à stocker ni à renouveler.
 
 ### 📌 Une grille complète, zéros compris
 

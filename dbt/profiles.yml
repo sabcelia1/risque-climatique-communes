@@ -1,6 +1,7 @@
 # Deux cibles :
 #   local    : DuckDB sur l'ordinateur, sans compte cloud (tests, développement)
-#   bigquery : Google BigQuery, via une clé de compte de service
+#   bigquery : Google BigQuery, avec les identifiants de l'environnement
+#              (fédération d'identité sur GitHub Actions, gcloud en local)
 # Aucun identifiant n'est écrit ici : tout passe par des variables d'environnement,
 # renseignées par src/lancer_dbt.py (en local) ou par GitHub Actions.
 risque_climatique:
@@ -12,8 +13,7 @@ risque_climatique:
       threads: 4
     bigquery:
       type: bigquery
-      method: service-account
-      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '') }}"
+      method: oauth
       project: "{{ env_var('GCP_PROJECT_ID', 'projet-non-renseigne') }}"
       dataset: risque
       location: EU

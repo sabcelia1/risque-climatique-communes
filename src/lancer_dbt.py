@@ -2,7 +2,7 @@
 
 Usage :
     python src/lancer_dbt.py            # en local (DuckDB), sans compte cloud
-    python src/lancer_dbt.py bigquery   # dans BigQuery (clé requise, voir docs/guide_gcp.md)
+    python src/lancer_dbt.py bigquery   # dans BigQuery (identifiants requis, voir docs/guide_gcp.md)
 
 Équivaut à `dbt build` (modèles + tests) lancé depuis la racine du projet.
 """
@@ -20,7 +20,7 @@ def main() -> int:
         print("Cible inconnue : utilisez « local » ou « bigquery »", file=sys.stderr)
         return 1
     if cible == "bigquery" and configurer() is None:
-        print("Clé Google Cloud introuvable : voir docs/guide_gcp.md", file=sys.stderr)
+        print("Identifiants Google Cloud introuvables : voir docs/guide_gcp.md", file=sys.stderr)
         return 1
 
     from dbt.cli.main import dbtRunner

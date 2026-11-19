@@ -1,70 +1,49 @@
-# Guide : connecter le projet à Google BigQuery
+# Guide : connecter le projet à Google BigQuery, sans clé
 
-Ce guide se fait **une seule fois** (environ 15 minutes). Sans lui, le pipeline fonctionne déjà en local avec DuckDB ; avec lui, les tables sont aussi construites dans BigQuery, chaque semaine, automatiquement.
+Ce guide se fait **une seule fois** (environ 10 minutes). Sans lui, le pipeline fonctionne déjà en local avec DuckDB ; avec lui, les tables sont aussi construites dans BigQuery, chaque semaine, automatiquement.
 
-> ⚠️ **Sécurité : la clé du compte de service est un mot de passe.**
-> - Ne l'envoyez **à personne** (ni par mail, ni dans une conversation, ni à une IA).
-> - Ne la déposez **jamais** sur GitHub : le dossier `secrets/` est exclu de Git, gardez-la uniquement là.
-> - Elle ne va qu'à deux endroits : `secrets/cle-gcp.json` sur votre ordinateur, et le secret GitHub `GCP_SA_KEY`, que vous collez vous-même.
-> - Si elle fuit par erreur : console Google Cloud → compte de service → onglet **Clés** → supprimez-la, puis créez-en une nouvelle.
+## Pourquoi « sans clé » ?
+
+La méthode classique consiste à télécharger une clé de compte de service (un fichier JSON) et à la confier à GitHub. Mais une clé est un mot de passe permanent : si elle fuit, n'importe qui peut l'utiliser. Google bloque d'ailleurs leur création par défaut dans les organisations récentes (règle `iam.disableServiceAccountKeyCreation`), ce qui est le cas de ce projet.
+
+Le projet utilise donc la **fédération d'identité de charge de travail** (*Workload Identity Federation*) :
+
+1. À chaque exécution, GitHub délivre au pipeline un **jeton signé et valable quelques minutes**, qui atteste « je suis le dépôt `sabcelia1/risque-climatique-communes` ».
+2. Google vérifie ce jeton et, s'il provient bien de **ce** dépôt, accorde un accès temporaire au compte de service `pipeline-risque`.
+3. Ce compte n'a que deux droits : écrire des tables BigQuery et lancer des requêtes.
+
+**Il n'existe donc aucun secret à stocker, à transmettre ou à faire tourner.** Les valeurs écrites dans `.github/workflows/pipeline.yml` (identifiant du projet, nom du compte de service, fournisseur d'identité) sont des identifiants publics, pas des mots de passe.
 
 ---
 
-## 1. Choisir le projet Google Cloud
+## 1. Lancer le script de configuration dans Cloud Shell
 
-1. Ouvrez [console.cloud.google.com](https://console.cloud.google.com).
-2. En haut, sélectionnez le projet utilisé pour [recharge-ve-france](https://github.com/sabcelia1/recharge-ve-france) : on peut le réutiliser, les tables de ce projet vont dans des jeux de données à part (`risque_raw` et `risque`).
-   *Ou* créez un nouveau projet (« Nouveau projet », nom : `risque-climatique`).
-3. Notez l'**ID du projet** (sous le nom, par exemple `risque-climatique-123456`).
-
-Le **bac à sable BigQuery** (sans carte bancaire) suffit. Il supprime les tables au bout de 60 jours, mais la mise à jour hebdomadaire les recrée.
-
-## 2. Créer un compte de service
-
-Un compte de service est un « utilisateur robot » qui n'a que les droits nécessaires au pipeline.
-
-1. Menu ☰ → **IAM et administration** → **Comptes de service** → **Créer un compte de service**.
-2. Nom : `pipeline-risque`, puis **Créer et continuer**.
-3. Ajoutez deux rôles :
-   - **Éditeur de données BigQuery** (`BigQuery Data Editor`) : créer et remplacer des tables ;
-   - **Utilisateur de tâche BigQuery** (`BigQuery Job User`) : lancer des requêtes.
-4. **Continuer**, puis **OK**.
-
-## 3. Créer la clé et la ranger
-
-1. Cliquez sur le compte `pipeline-risque` → onglet **Clés** → **Ajouter une clé** → **Créer une clé** → **JSON** → **Créer**. Un fichier `.json` se télécharge.
-2. Dans le dossier du projet, créez un dossier **`secrets`**, et déplacez-y le fichier en le renommant **`cle-gcp.json`** :
+1. Ouvrez [console.cloud.google.com](https://console.cloud.google.com) et sélectionnez le projet **risques-climatiuqes-communes**.
+2. En haut à droite, cliquez sur l'icône **Activer Cloud Shell** (`>_`). Un terminal s'ouvre en bas de la page (cliquez sur **Autoriser** si on vous le demande).
+3. Copiez **tout** le contenu de [`scripts/configurer_gcp.sh`](../scripts/configurer_gcp.sh), collez-le dans le terminal et appuyez sur Entrée.
+4. Le script crée le compte de service (ou garde celui qui existe), lui donne ses deux rôles BigQuery, puis crée la fédération d'identité limitée à ce dépôt. Il se termine par une ligne :
    ```
-   risque-climatique-communes\
-   └── secrets\
-       └── cle-gcp.json
+   GCP_WIF_PROVIDER: projects/123456789/locations/global/workloadIdentityPools/github/providers/github-repo
    ```
-3. Supprimez la copie restée dans *Téléchargements*.
 
-> Si la console refuse de créer une clé (« la création de clés est désactivée par une règle d'administration »), votre compte dépend d'une organisation qui l'interdit : dites-le-moi, on passera par une autre méthode d'authentification (fédération d'identité GitHub, sans clé).
+Le script peut être relancé sans risque : ce qui existe déjà est conservé.
 
-## 4. Vérifier en local
+## 2. Renseigner le fournisseur dans le workflow
 
-Double-cliquez sur `lancer.bat`. Les étapes 5 et 6 apparaissent :
+Dans `.github/workflows/pipeline.yml`, remplacez la ligne `GCP_WIF_PROVIDER: ""` par la valeur affichée à la fin du script (entre guillemets), puis publiez la modification. Cette valeur n'est pas secrète.
 
-```
-=== Etape 5 : chargement dans BigQuery
-  <projet>.risque_raw.communes : 34 9xx lignes
-  <projet>.risque_raw.catnat : 247 xxx lignes
-=== Etape 6 : modeles dbt et tests dans BigQuery
-...
-Done. PASS=25 WARN=0 ERROR=0
-```
+## 3. Lancer et vérifier
 
-Dans la console BigQuery, les jeux de données `risque_raw` et `risque` sont apparus.
+Onglet **Actions** du dépôt → **Pipeline de données** → **Run workflow**. Les étapes « Connexion à Google Cloud », « Chargement dans BigQuery » et « Modèles dbt et tests (BigQuery) » ne sont plus ignorées, et la console BigQuery affiche les jeux de données `risque_raw` et `risque`.
 
-## 5. Activer la mise à jour automatique (GitHub Actions)
+Le pipeline tourne ensuite **chaque lundi**. Le **bac à sable BigQuery** (sans carte bancaire) suffit : il supprime les tables au bout de 60 jours, mais la mise à jour hebdomadaire les recrée.
 
-1. Ouvrez `secrets\cle-gcp.json` avec le Bloc-notes, **sélectionnez tout** (Ctrl + A) et copiez (Ctrl + C).
-2. Sur GitHub, dans le dépôt : **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
-3. Name : **`GCP_SA_KEY`** ; Secret : collez le contenu ; **Add secret**. Fermez le Bloc-notes sans rien enregistrer.
-4. Onglet **Actions** → **Pipeline de données** → **Run workflow**.
+---
 
-Le pipeline tourne ensuite **chaque lundi** : téléchargement de la dernière base GASPAR, nettoyage, tests, chargement dans BigQuery, modèles dbt et leurs tests. Une coche verte dans l'onglet Actions signifie que tout est passé ; les rapports de qualité sont téléchargeables dans le résumé de chaque exécution (« Artifacts »).
+## Optionnel : BigQuery depuis votre ordinateur
 
-GitHub masque automatiquement le secret dans les journaux d'exécution, et personne (pas même vous) ne peut le relire après l'avoir enregistré.
+Ce n'est pas nécessaire : en local, `lancer.bat` construit les mêmes tables dans DuckDB. Pour interroger BigQuery depuis votre poste :
+
+1. Installez [Google Cloud CLI](https://cloud.google.com/sdk/docs/install).
+2. Dans un terminal : `gcloud auth application-default login`, puis connectez-vous dans le navigateur.
+3. Relancez `lancer.bat` : les étapes 5 et 6 (chargement et dbt dans BigQuery) s'exécutent avec votre propre compte.

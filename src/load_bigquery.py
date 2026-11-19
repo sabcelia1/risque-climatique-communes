@@ -18,7 +18,7 @@ TABLES = ["communes", "catnat"]
 def main() -> int:
     projet = configurer()
     if projet is None:
-        print("Clé Google Cloud introuvable (secrets/cle-gcp.json) : voir docs/guide_gcp.md",
+        print("Identifiants Google Cloud introuvables : voir docs/guide_gcp.md",
               file=sys.stderr)
         return 1
     manquants = [t for t in TABLES if not (PROCESSED_DIR / f"{t}.parquet").exists()]
