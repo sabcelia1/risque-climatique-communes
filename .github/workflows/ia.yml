@@ -1,0 +1,50 @@
+# IA générative (étape 4) : fiches de risque d'exemple et évaluation de l'assistant SQL.
+# Lancement manuel (quotas du niveau gratuit de Gemini) : Actions -> « IA générative » -> Run workflow.
+name: IA générative
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ia
+  cancel-in-progress: false
+
+jobs:
+  ia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installation
+        run: pip install -r requirements.txt
+
+      - name: Données, dbt et modèle
+        run: |
+          python src/ingest.py
+          python src/clean.py > /dev/null
+          python src/lancer_dbt.py local > /dev/null
+          python src/modele.py > /dev/null
+
+      - name: Fiches de risque d'exemple
+        run: python src/fiches.py --exemples
+
+      - name: Évaluation de l'assistant SQL
+        run: python src/evaluer_assistant.py
+
+      - name: Publier les résultats
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/fiches_exemples.md docs/fiches_exemples.json docs/evaluation_assistant.md
+          git commit -m "IA générative : fiches d'exemple et évaluation de l'assistant" && git push || echo "Aucun changement"
