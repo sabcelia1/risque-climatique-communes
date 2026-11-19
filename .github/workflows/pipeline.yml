@@ -64,6 +64,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # L'étiquette suit la version du code qui a produit les données
+          git tag -f donnees-app "$GITHUB_SHA"
+          git push -f origin refs/tags/donnees-app
           gh release view donnees-app > /dev/null 2>&1 || gh release create donnees-app --latest=false \
             --title "Données de l'application" \
             --notes "Export hebdomadaire utilisé par l'application Streamlit (généré par GitHub Actions)."
