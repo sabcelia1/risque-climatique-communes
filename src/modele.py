@@ -193,6 +193,7 @@ def figures(resultats: dict, importances: dict, calibrations: dict) -> None:
             ax.plot(annees, [res["par_annee"][a]["auc"] for a in annees], marker="o",
                     label=nom, color=couleurs[nom])
         ax.set_title(f"{NOMS[famille]} : AUC par année de test")
+        ax.set_xticks(sorted(next(iter(resultats[famille].values()))["par_annee"]))
         ax.set_xlabel("Année")
         ax.grid(alpha=0.3)
     np.atleast_1d(axes)[0].set_ylabel("AUC (0,5 = hasard)")
