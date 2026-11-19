@@ -1,0 +1,29 @@
+name: risque_climatique
+version: "1.0.0"
+config-version: 2
+profile: risque_climatique
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "logs"]
+
+vars:
+  annee_debut: 1982
+  annee_fin: 2024            # 2025 est incomplète (voir docs/journal_analyse.md)
+  # Dernière année évaluable par famille : 90 % des reconnaissances arrivent en
+  # 159 jours pour l'inondation, mais en 4,2 ans pour la sécheresse.
+  derniere_annee_evaluable:
+    inondation: 2024
+    secheresse: 2021
+  annees_historique_min: 10  # recul nécessaire pour calculer les variables sur 10 ans
+
+models:
+  risque_climatique:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view
+    marts:
+      +materialized: table

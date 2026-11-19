@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: stg_catnat
+    description: Reconnaissances CatNat typées (une ligne par ligne GASPAR nettoyée).
+    columns:
+      - name: code_insee
+        data_tests: [not_null]
+      - name: date_debut
+        data_tests: [not_null]
+      - name: famille_peril
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [secheresse, inondation, mouvement_terrain, vent_tempete, seisme, autre, inconnu]
+
+  - name: stg_communes
+    description: Communes actuelles.
+    columns:
+      - name: code_insee
+        data_tests: [unique, not_null]

@@ -12,6 +12,8 @@ venv/
 .ipynb_checkpoints/
 
 # Identifiants cloud (ne jamais publier !)
+secrets/
+gha-creds-*.json
 *.json.key
 credentials*.json
 service-account*.json
@@ -21,6 +23,12 @@ service-account*.json
 *.pbix
 **/.pbi/cache.abf
 **/.pbi/localSettings.json
+
+# dbt
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+logs/
 
 # Système
 .DS_Store

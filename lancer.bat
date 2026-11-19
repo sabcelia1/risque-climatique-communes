@@ -1,5 +1,5 @@
 @echo off
-REM Lance tout le pipeline : environnement Python, tests, ingestion, nettoyage.
+REM Lance tout le pipeline : environnement Python, tests, ingestion, nettoyage, dbt, BigQuery.
 REM Double-cliquez sur ce fichier, ou tapez "lancer" dans une console ouverte dans ce dossier.
 cd /d "%~dp0"
 "%SystemRoot%\System32\chcp.com" 65001 >nul 2>&1
@@ -28,6 +28,25 @@ echo.
 echo === Etape 3 : exploration
 ".venv\Scripts\python.exe" src\explorer.py || goto :erreur
 
+echo.
+echo === Etape 4 : modeles dbt et tests, en local (DuckDB)
+".venv\Scripts\python.exe" src\lancer_dbt.py local || goto :erreur
+
+if not exist "secrets\cle-gcp.json" (
+    echo.
+    echo === BigQuery ignore : pas de cle dans secrets\cle-gcp.json ^(voir docs\guide_gcp.md^)
+    goto :fin
+)
+
+echo.
+echo === Etape 5 : chargement dans BigQuery
+".venv\Scripts\python.exe" src\load_bigquery.py || goto :erreur
+
+echo.
+echo === Etape 6 : modeles dbt et tests dans BigQuery
+".venv\Scripts\python.exe" src\lancer_dbt.py bigquery || goto :erreur
+
+:fin
 echo.
 echo === Termine ! Rapports : reports\qualite_donnees.md et reports\exploration.md
 pause

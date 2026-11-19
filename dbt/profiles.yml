@@ -1,0 +1,22 @@
+# Deux cibles :
+#   local    : DuckDB sur l'ordinateur, sans compte cloud (tests, développement)
+#   bigquery : Google BigQuery, via une clé de compte de service
+# Aucun identifiant n'est écrit ici : tout passe par des variables d'environnement,
+# renseignées par src/lancer_dbt.py (en local) ou par GitHub Actions.
+risque_climatique:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'data/processed/risque.duckdb') }}"
+      threads: 4
+    bigquery:
+      type: bigquery
+      method: service-account
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS', '') }}"
+      project: "{{ env_var('GCP_PROJECT_ID', 'projet-non-renseigne') }}"
+      dataset: risque
+      location: EU
+      threads: 4
+      job_execution_timeout_seconds: 600
+      priority: interactive

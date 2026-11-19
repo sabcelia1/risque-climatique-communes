@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: int_evenements
+    description: Un événement reconnu distinct par ligne (commune actuelle, 1982 à annee_fin).
+    columns:
+      - name: delai_reconnaissance_jours
+        description: Jours entre le début de l'événement et la signature de l'arrêté.
+
+  - name: int_grille_commune_annee
+    description: Une ligne par commune, année et famille modélisée (sécheresse, inondation), zéros compris.
+    data_tests:
+      - lignes_uniques:
+          arguments:
+            colonnes: [code_insee, annee, famille_peril]

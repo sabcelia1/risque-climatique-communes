@@ -127,3 +127,43 @@ Répartition des événements reconnus par famille de péril (%) :
 - **Observation :** les reconnaissances « vent/tempête » passent de 12,1 % à 0,8 %, et les « mouvements de terrain » de 19,9 % à 2,6 %.
 - **Hypothèse :** des baisses aussi brutales ressemblent davantage à des changements de règles de prise en charge ou de libellés qu'à une évolution du climat. Le vent relève en général d'autres garanties d'assurance que le régime CatNat, mais ce point reste à vérifier dans les textes.
 - **Conséquence :** le modèle sera construit **par famille de péril**, en commençant par la **sécheresse** et l'**inondation**, qui représentent 96 % des événements reconnus depuis 2015.
+
+---
+
+## Étape 2 — Data engineering
+
+### 📌 Choix d'architecture
+
+- **dbt** pour toutes les transformations SQL : chaque table est versionnée, documentée et testée, et ses dépendances sont explicites.
+- **Deux cibles pour le même code :** DuckDB en local (aucun compte cloud, tests rapides) et BigQuery en production. Le SQL évite les fonctions propres à une seule base, et les rares différences passent par une macro (`serie_annees`).
+- **Rechargement complet à chaque exécution** plutôt qu'incrémental : la base GASPAR est republiée en entier (et corrigée rétroactivement), elle reste petite (≈ 250 000 lignes), et le bac à sable BigQuery n'autorise pas les mises à jour ligne à ligne (`MERGE`).
+- **Aucun identifiant dans le code :** la clé Google Cloud est lue dans `secrets/` (exclu de Git) ou dans un secret GitHub.
+
+### 📌 Une grille complète, zéros compris
+
+Pour calculer « le nombre d'événements des 5 dernières années », une fenêtre SQL compte des **lignes**, pas des années. Si les années sans reconnaissance n'existent pas dans la table, « 5 lignes précédentes » peut couvrir 20 ans. `int_grille_commune_annee` crée donc **toutes** les combinaisons commune × année × péril, avec 0 les années sans événement (≈ 35 000 communes × 43 ans × 2 périls ≈ 3 millions de lignes).
+
+### 📌 Interdire la fuite de données
+
+Le risque principal d'un modèle de prévision : utiliser, sans s'en rendre compte, une information de l'année que l'on cherche à prédire. Les performances semblent excellentes, puis s'effondrent en conditions réelles.
+
+- Toutes les variables de `mart_features_risque` s'arrêtent à l'**année précédente** (fenêtres `... and 1 preceding`, taux départemental de `t-1`).
+- Un **test dbt** recalcule ces variables par une autre méthode (jointure) et échoue à la moindre différence.
+- **Le test a été lui-même testé :** en remplaçant volontairement une fenêtre par une version qui inclut l'année courante, il échoue (549 lignes en erreur sur les données d'essai).
+- Les totaux de `dim_commune` couvrent toute la période : ils sont réservés à la description et **exclus** des variables du modèle.
+
+### 📌 Années évaluables
+
+Les décisions de l'étape 1 sont codées une seule fois, dans `dbt_project.yml` :
+
+| Famille | Dernière année évaluable | Raison |
+|---|---:|---|
+| Inondation | 2024 | 90 % des reconnaissances en moins de 159 jours |
+| Sécheresse | 2021 | 90 % des reconnaissances en moins de 4,2 ans |
+
+La colonne `annee_evaluable` signale les autres lignes, que l'étape 3 n'utilisera ni pour l'entraînement ni pour l'évaluation. `historique_complet` signale les années disposant de 10 ans de recul (à partir de 1992).
+
+### Limites assumées
+
+- **Communes fusionnées :** les 0,2 % de lignes dont le code a disparu du référentiel (H3) sont écartées des modèles plutôt que rattachées, faute de table de passage simple à maintenir. Effet négligeable vu leur volume.
+- **Population actuelle :** la population et la superficie sont celles d'aujourd'hui, appliquées à toutes les années. C'est acceptable pour un ordre de grandeur (effet de taille), mais ce n'est pas la population de chaque année.

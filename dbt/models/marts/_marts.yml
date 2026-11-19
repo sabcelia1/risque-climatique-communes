@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: dim_commune
+    description: Une ligne par commune actuelle, avec un résumé descriptif de son historique CatNat.
+    columns:
+      - name: code_insee
+        data_tests: [unique, not_null]
+
+  - name: fct_evenements
+    description: Un événement CatNat reconnu distinct par ligne (commune x péril x dates).
+    data_tests:
+      - lignes_uniques:
+          arguments:
+            colonnes: [code_insee, libelle_peril, date_debut, date_fin]
+    columns:
+      - name: code_insee
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_commune')
+                field: code_insee
+      - name: famille_peril
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [secheresse, inondation, mouvement_terrain, vent_tempete, seisme, autre, inconnu]
+
+  - name: mart_features_risque
+    description: >
+      Table d'entraînement : une ligne par commune, année et famille (sécheresse,
+      inondation). Variables calculées uniquement sur les années antérieures.
+    data_tests:
+      - lignes_uniques:
+          arguments:
+            colonnes: [code_insee, annee, famille_peril]
+    columns:
+      - name: cible
+        description: 1 si au moins une reconnaissance CatNat de cette famille l'année donnée.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: famille_peril
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [secheresse, inondation]
+      - name: annee_evaluable
+        description: >
+          Faux pour les années encore incomplètes (sécheresse après 2021) : la cible
+          y est sous-estimée, ces lignes ne servent ni à l'entraînement ni au test.
+      - name: historique_complet
+        description: Vrai quand 10 années d'historique sont disponibles (à partir de 1992).
+      - name: taux_dept_annee_prec
+        description: Part des communes du département touchées l'année précédente.

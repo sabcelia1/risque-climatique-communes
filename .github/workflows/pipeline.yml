@@ -1,0 +1,69 @@
+# Mise à jour automatique : chaque lundi, le pipeline télécharge la dernière base
+# GASPAR, la nettoie, la teste, la charge dans BigQuery et reconstruit les modèles dbt.
+name: Pipeline de données
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"     # lundi 5 h 17 UTC
+  workflow_dispatch:          # bouton « Run workflow » dans l'onglet Actions
+  push:
+    branches: [main]
+    paths: ["src/**", "dbt/**", "tests/**", "requirements.txt", ".github/workflows/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLE_GCP_PRESENTE: ${{ secrets.GCP_SA_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installation
+        run: pip install -r requirements.txt
+
+      - name: Tests unitaires
+        run: python -m pytest -q
+
+      - name: Téléchargement des données
+        run: python src/ingest.py
+
+      - name: Nettoyage et contrôles qualité
+        run: python src/clean.py
+
+      - name: Modèles dbt et tests (DuckDB)
+        run: python src/lancer_dbt.py local
+
+      - name: Connexion à Google Cloud
+        if: env.CLE_GCP_PRESENTE == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Chargement dans BigQuery
+        if: env.CLE_GCP_PRESENTE == 'true'
+        run: python src/load_bigquery.py
+
+      - name: Modèles dbt et tests (BigQuery)
+        if: env.CLE_GCP_PRESENTE == 'true'
+        run: python src/lancer_dbt.py bigquery
+
+      - name: Rapports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports
+          path: reports/
+          if-no-files-found: ignore
