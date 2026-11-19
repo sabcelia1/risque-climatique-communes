@@ -235,7 +235,7 @@ def nettoyer_catnat(codes_valides: set[str]) -> pd.DataFrame:
     df["commune_actuelle"] = df["code_insee"].isin(codes_valides)
     n_old = int((~df["commune_actuelle"]).sum())
     log("catnat", "codes absents du référentiel actuel (communes fusionnées ?)",
-        f"{n_old:,} ({n_old / len(df):.1%}) — rattachement prévu à l'étape 2")
+        f"{n_old:,} ({n_old / len(df):.1%}) — écartés des modèles dbt (voir journal)")
     # 6. Un même événement peut apparaître sur plusieurs lignes (arrêtés
     #    rectificatifs, dates de publication corrigées) : on le repère
     cle_evt = ["code_insee", "libelle_peril", "date_debut", "date_fin"]

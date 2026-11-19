@@ -86,7 +86,7 @@ La base GASPAR présente plusieurs défauts signalés publiquement par ses utili
 | Lignes répétées 2 ou 3 fois | Dédoublonnage, nombre de lignes supprimées tracé |
 | Accents mal encodés (« SÃ©cheresse ») | Réparation automatique |
 | Dates incohérentes (fin avant début, événements de plus d'un an hors sécheresse) | Mises à vide ou signalées, jamais supprimées en silence |
-| Codes de communes fusionnées depuis | Signalés, rattachement aux communes actuelles à l'étape 2 |
+| Codes de communes fusionnées depuis | Signalés, puis écartés des modèles (0,2 % des lignes) |
 | Libellés de périls très détaillés | Regroupement en 6 familles (inondation, sécheresse, mouvement de terrain, vent/tempête, séisme, autre) |
 
 Les règles de nettoyage sont couvertes par des **tests unitaires** (`tests/`), exécutés avant chaque traitement.
