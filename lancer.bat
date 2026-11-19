@@ -36,6 +36,10 @@ echo.
 echo === Etape 5 : modele de prediction (LightGBM, SHAP)
 ".venv\Scripts\python.exe" src\modele.py || goto :erreur
 
+echo.
+echo === Etape 6 : export pour l'application
+".venv\Scripts\python.exe" src\exporter_app.py || goto :erreur
+
 ".venv\Scripts\python.exe" src\gcp.py
 if errorlevel 1 (
     echo.
@@ -44,16 +48,17 @@ if errorlevel 1 (
 )
 
 echo.
-echo === Etape 6 : chargement dans BigQuery
+echo === Etape 7 : chargement dans BigQuery
 ".venv\Scripts\python.exe" src\load_bigquery.py || goto :erreur
 
 echo.
-echo === Etape 7 : modeles dbt et tests dans BigQuery
+echo === Etape 8 : modeles dbt et tests dans BigQuery
 ".venv\Scripts\python.exe" src\lancer_dbt.py bigquery || goto :erreur
 
 :fin
 echo.
 echo === Termine ! Rapports : reports\qualite_donnees.md, reports\exploration.md et reports\modele.md
+echo     Application : lancer_application.bat
 pause
 exit /b 0
 

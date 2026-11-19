@@ -170,16 +170,9 @@ def en_markdown(resultat: dict) -> str:
                       f"**Historique.** {f['historique']}", "", f"**Limites.** {f['limites']}", ""])
 
 
-def base_avec_facteurs():
+def base_avec_facteurs(export=None):
     """Base isolée, complétée des prédictions détaillées (facteurs explicatifs compris)."""
-    from config import PROCESSED_DIR
-
-    con = base_isolee()
-    preds = pd.read_parquet(PROCESSED_DIR / "predictions.parquet")
-    con.register("facteurs_df", preds)
-    con.execute("create table predictions_facteurs as select * from facteurs_df")
-    con.unregister("facteurs_df")
-    return con
+    return base_isolee(export, avec_facteurs=True)
 
 
 def main() -> int:

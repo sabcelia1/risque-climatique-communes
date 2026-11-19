@@ -26,12 +26,14 @@ TABLES = {
             "part_argile_faible": "part du territoire en exposition faible aux argiles (0 à 1)",
             "part_argile_moyen": "part en exposition moyenne (0 à 1)",
             "part_argile_fort": "part en exposition forte (0 à 1)",
+            "latitude": "latitude du centre de la commune", "longitude": "longitude du centre de la commune",
         },
         "sql": """select c.code_insee, c.nom_commune, c.code_departement, c.nom_departement, c.nom_region,
                          c.population, round(c.surface_km2, 2) as surface_km2,
                          round(c.densite_hab_km2, 1) as densite_hab_km2, c.nb_evenements_total,
                          c.nb_secheresses, c.nb_inondations, c.derniere_annee_touchee,
-                         a.part_argile_faible, a.part_argile_moyen, a.part_argile_fort
+                         a.part_argile_faible, a.part_argile_moyen, a.part_argile_fort,
+                         round(c.latitude, 4) as latitude, round(c.longitude, 4) as longitude
                   from src.dim_commune c left join src.exposition_argiles a using (code_insee)""",
     },
     "evenements": {
@@ -67,8 +69,20 @@ TABLES = {
 }
 
 
-def base_isolee() -> duckdb.DuckDBPyConnection:
-    """Connexion en mémoire contenant uniquement les tables de TABLES, puis verrouillée."""
+def base_isolee(export=None, avec_facteurs: bool = False) -> duckdb.DuckDBPyConnection:
+    """Connexion en mémoire contenant uniquement les tables de TABLES, puis verrouillée.
+
+    export : chemin d'un export pour l'application (src/exporter_app.py) ; à défaut, les
+    tables sont construites à partir des sorties du pipeline (dbt et modèle).
+    avec_facteurs : ajoute la table predictions_facteurs (détail des prédictions, pour les fiches).
+    """
+    if export is not None:
+        con = duckdb.connect(":memory:")
+        con.execute(f"attach '{str(export).replace(chr(92), '/')}' as src (read_only)")
+        for nom in list(TABLES) + (["predictions_facteurs"] if avec_facteurs else []):
+            con.execute(f"create table {nom} as select * from src.{nom}")
+        con.execute("detach src")
+        return _verrouiller(con)
     source = PROCESSED_DIR / "risque.duckdb"
     predictions = PROCESSED_DIR / "predictions.parquet"
     for chemin, etape in ((source, "src/lancer_dbt.py local"), (predictions, "src/modele.py")):
@@ -78,7 +92,13 @@ def base_isolee() -> duckdb.DuckDBPyConnection:
     con.execute(f"attach '{source.as_posix()}' as src (read_only)")
     for nom, table in TABLES.items():
         con.execute(f"create table {nom} as " + table["sql"].format(predictions=predictions.as_posix()))
+    if avec_facteurs:
+        con.execute(f"create table predictions_facteurs as select * from read_parquet('{predictions.as_posix()}')")
     con.execute("detach src")
+    return _verrouiller(con)
+
+
+def _verrouiller(con: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyConnection:
     con.execute("set enable_external_access = false")
     con.execute("set lock_configuration = true")
     return con

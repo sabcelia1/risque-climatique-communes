@@ -36,3 +36,6 @@ logs/
 # Système
 .DS_Store
 Thumbs.db
+
+# Données de l'application (publiées en Release GitHub, pas dans Git)
+app/donnees/

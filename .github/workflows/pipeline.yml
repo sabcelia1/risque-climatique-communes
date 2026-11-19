@@ -11,7 +11,7 @@ on:
     paths: ["src/**", "dbt/**", "tests/**", "requirements.txt", ".github/workflows/**"]
 
 permissions:
-  contents: read
+  contents: write      # publication des données de l'application (Release « donnees-app »)
   id-token: write      # jeton OIDC : GitHub prouve son identité à Google, sans clé
 
 concurrency:
@@ -55,6 +55,20 @@ jobs:
           python src/modele.py
           cat reports/modele.md >> "$GITHUB_STEP_SUMMARY"
           cat reports/metriques_modele.json
+
+      - name: Export pour l'application
+        run: python src/exporter_app.py
+
+      - name: Publication des données de l'application
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view donnees-app > /dev/null 2>&1 || gh release create donnees-app --latest=false \
+            --title "Données de l'application" \
+            --notes "Export hebdomadaire utilisé par l'application Streamlit (généré par GitHub Actions)."
+          gh release upload donnees-app app/donnees/app.duckdb app/donnees/metriques_modele.json \
+            app/donnees/fiches_exemples.json --clobber
 
       - name: Connexion à Google Cloud (fédération d'identité, sans clé)
         if: env.GCP_WIF_PROVIDER != ''

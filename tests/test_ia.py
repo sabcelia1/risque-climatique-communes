@@ -59,10 +59,11 @@ def test_lectures_acceptees_et_plafonnees(sql):
 def base(tmp_path, monkeypatch):
     con = duckdb.connect(str(tmp_path / "risque.duckdb"))
     con.execute("""create table dim_commune as select * from (values
-        ('32013', 'Auch', '32', 'Gers', 'Occitanie', 22000, 72.5, 303.4, 40, 12, 20, 2022),
-        ('29019', 'Brest', '29', 'Finistère', 'Bretagne', 140000, 49.5, 2828.3, 10, 0, 8, 2018))
+        ('32013', 'Auch', '32', 'Gers', 'Occitanie', 22000, 72.5, 303.4, 40, 12, 20, 2022, 43.65, 0.58),
+        ('29019', 'Brest', '29', 'Finistère', 'Bretagne', 140000, 49.5, 2828.3, 10, 0, 8, 2018, 48.4, -4.5))
         t(code_insee, nom_commune, code_departement, nom_departement, nom_region, population, surface_km2,
-          densite_hab_km2, nb_evenements_total, nb_secheresses, nb_inondations, derniere_annee_touchee)""")
+          densite_hab_km2, nb_evenements_total, nb_secheresses, nb_inondations, derniere_annee_touchee,
+          latitude, longitude)""")
     con.execute("""create table exposition_argiles as select * from (values ('32013', 0.0, 0.05, 0.95),
         ('29019', 0.3, 0.0, 0.0)) t(code_insee, part_argile_faible, part_argile_moyen, part_argile_fort)""")
     con.execute("""create table fct_evenements as select * from (values
@@ -175,3 +176,16 @@ def test_paris_non_couverte_par_le_zonage_argiles():
     chemin = Path(__file__).resolve().parents[1] / "dbt" / "seeds" / "exposition_argiles.csv"
     paris = [l for l in csv.DictReader(open(chemin, encoding="utf-8")) if l["code_insee"] == "75056"]
     assert paris and paris[0]["part_argile_fort"] == ""
+
+
+def test_export_pour_l_application(base, monkeypatch):
+    import exporter_app
+    monkeypatch.setattr(exporter_app, "DOSSIER", base / "app")
+    monkeypatch.setattr(exporter_app, "REPORTS_DIR", base)
+    assert exporter_app.main() == 0
+    con = base_ia.base_isolee(base / "app" / "app.duckdb")
+    assert {r[0] for r in con.execute("select table_name from information_schema.tables").fetchall()} == set(base_ia.TABLES)
+    with pytest.raises(duckdb.Error):
+        con.execute(f"select * from read_parquet('{(base / 'predictions.parquet').as_posix()}')")
+    faits = fiches.dossier(fiches.base_avec_facteurs(base / "app" / "app.duckdb"), "32013")
+    assert faits["exposition_argiles"]["forte"] == "95 %"

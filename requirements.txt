@@ -15,3 +15,5 @@ matplotlib>=3.8
 google-genai>=1.20
 sqlglot>=25
 pydantic>=2.6
+# Étape 5 — application
+streamlit>=1.40
